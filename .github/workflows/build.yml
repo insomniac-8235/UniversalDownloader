@@ -1,0 +1,42 @@
+name: Build Windows Release
+
+on:
+  push:
+    branches: [ "master" ]  # Matches your branch name
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install customtkinter yt-dlp pyinstaller
+
+    - name: Compile Executable with Branding
+      # We use python -m PyInstaller to avoid the "not recognized" error
+      run: |
+        python -m PyInstaller --noconsole --onefile `
+        --collect-all customtkinter `
+        --icon "assets/icon.ico" `
+        --version-file "version.txt" `
+        --add-data "assets;assets" `
+        --name "UniversalDownloader" `
+        main.py
+
+    - name: Upload Finished Exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: UniversalDownloader-Windows-Build
+        path: dist/UniversalDownloader.exe
