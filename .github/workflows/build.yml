@@ -39,12 +39,13 @@ jobs:
         run: choco install ffmpeg -y
 
       - name: Copy FFmpeg binaries
+        shell: pwsh
         run: |
           copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
           copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe" ffprobe.exe
 
       - name: Build executable with version info
-        shell: cmd
+        shell: pwsh
         run: |
           python -m PyInstaller --clean --noconsole --onefile `
             --collect-all customtkinter `
@@ -90,7 +91,6 @@ jobs:
         run: |
           curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/getrelease/zip
           unzip -o ffmpeg.zip
-
           chmod +x ffmpeg
           rm ffmpeg.zip
 
@@ -108,18 +108,8 @@ jobs:
       - name: Create DMG
         id: rename
         run: |
-          cd dist
-          create-dmg UniversalDownloader_macOS.app \
-            --overwrite \
-            --dmg-title "Universal Downloader ${{ env.VERSION }}" \
-            "${APP_NAME}_macOS_${VERSION}.dmg"
-
-      - name: Set artifact output
-        id: rename
-        run: |
           hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder dist/UniversalDownloader_macOS.app -ov -format UDZO "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
           echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
-
 
   release:
     name: Create Release
@@ -128,7 +118,6 @@ jobs:
     permissions:
       contents: write
     if: startsWith(github.ref, 'refs/tags/')
-
     steps:
       - name: Create Versions File with commit hash
         run: |
