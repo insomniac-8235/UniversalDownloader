@@ -1,16 +1,17 @@
-name: Build Windows Release
+name: Build & Release  # The overall workflow name
 
 on:
   push:
     branches: [ "main" ]
     tags:
-      - '*'
+      - 'v*'
 
 jobs:
-  build:
+  build-windows: # This specific job handles Windows
+    name: Windows Build
     runs-on: windows-latest
     permissions:
-      contents: write # This ensures the 403 error never comes back
+      contents: write
 
     steps:
     - name: Checkout Code
@@ -26,14 +27,30 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Install FFmpeg
+      run: |
+        choco install ffmpeg -y
+
+    - name: Copy FFmpeg
+      run: |
+        copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
+
+    - name: Copy Engines
+      run: |
+        copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
+        copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe" ffprobe.exe
+
     - name: Compile Executable
       run: |
-        python -m PyInstaller --noconsole --onefile `
+        python -m PyInstaller --clean --noconsole --onefile `
         --collect-all customtkinter `
+        --collect-all yt_dlp `
         --icon "assets/icon.ico" `
         --add-data "assets;assets" `
+        --add-binary "ffmpeg.exe;." `
+        --add-binary "ffprobe.exe;." `
         --name "UniversalDownloader_win64_${{ github.ref_name }}" `
-        main.py
+        "main.py"
 
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')

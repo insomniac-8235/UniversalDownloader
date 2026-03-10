@@ -5,6 +5,19 @@ import threading
 import os
 import sys
 
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
+
 # --- PYINSTALLER NOCONSOLE FIX ---
 # If the app is compiled without a console, route all print statements to a black hole
 if sys.stdout is None:
@@ -14,8 +27,9 @@ if sys.stderr is None:
 
 try:
     from ctypes import windll
+
     # Tells Windows to render the app at native resolution
-    windll.shcore.SetProcessDpiAwareness(1) 
+    windll.shcore.SetProcessDpiAwareness(1)
 except Exception:
     pass
 
@@ -25,30 +39,31 @@ ctk.set_default_color_theme("blue")
 ctk.set_widget_scaling(1)  # Forces widgets to render at 100% internal scale
 ctk.set_window_scaling(1)  # Forces the window to render at 100% internal scale
 
+
 class MyLogger:
-    def debug(self, msg): pass
-    def warning(self, msg): pass
-    def error(self, msg): pass
+    def debug(self, msg):
+        # Only print if it's not a noisy progress message
+        if not msg.startswith('[debug] '):
+            print(f"DEBUG: {msg}")
+    def warning(self, msg): print(f"WARNING: {msg}")
+    def error(self, msg): print(f"ERROR: {msg}")
+
 
 class UniversalDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
-        
+
         # --- WINDOW CONFIG ---
         self.title("Universal Media Downloader")
         self.geometry("500x400")
         self.resizable(False, False)
-        
+
         # Set Window Icon (Works in both development and PyInstaller)
         if hasattr(sys, '_MEIPASS'):
-            icon_path = os.path.join(sys._MEIPASS, "assets/icon.ico")
+            icon_path = os.path.join(sys._MEIPASS, "assets", "icon.ico")  # Fixed slash
         else:
-            icon_path = "assets/icon.ico"
+            icon_path = os.path.join("assets", "icon.ico")  # Fixed slash
 
-        if os.path.exists(icon_path):
-            self.iconbitmap(icon_path)
-            
-        
         # --- THEME CONSTANTS ---
         # Backgrounds & Tracks
         self.APP_BG = ("#ebebeb", "#242424")  # Matches System background
@@ -60,31 +75,31 @@ class UniversalDownloader(ctk.CTk):
         self.ENTRY_FOCUS = ("#1976D2", "#1976D2")  # Active glow (typing)
 
         # Buttons
-        self.ACTION_BTN = ("#1976D2", "#1976D2") # Primary action (Download Now)
+        self.ACTION_BTN = ("#1976D2", "#1976D2")  # Primary action (Download Now)
         self.BTN_DISABLED = ("#FCFCFC", "#343434")  # Disabled state (greyed out)
-        self.ACTION_HOVER = ("#448BD3", "#448BD3")  # Hover for active button, could add subtle effect if desired)
+        self.ACTION_HOVER = ("#448BD3", "#448BD3")  # Hover for active button, could add subtle effect if desire
         self.BTN_HOVER = ("#EBEBEB", "#555555")  # Soft hover for ghost buttons
         self.TEXT_DISABLED = ("#CECECE", "#666666")  # Disabled button text
-        self.ACTION_TEXT =("#EBEBEB", "#EBEBEB")  # Text on action button  
+        self.ACTION_TEXT = ("#EBEBEB", "#EBEBEB")  # Text on action button
 
         # Progress & Text   
         self.PROG_FILL = ("#1976D2", "#1976D2")  # Bouncing bar color
-        self.TEXT_MAIN = ("#444444", "#D4D4D4") # Main text color (labels, entries when filled)
+        self.TEXT_MAIN = ("#444444", "#D4D4D4")  # Main text color (labels, entries when filled)
         self.TEXT_GHOST = ("#666666", "#d4d4d4")  # Placeholder text color
-        self.TEXT_VERSION = ("#888888", "#555555") # Version and credits text
+        self.TEXT_VERSION = ("#888888", "#555555")  # Version and credits text
 
         # --- FONTS (Upgraded) ---
         # Main UI elements (Buttons, Labels, Switches)
         self.FONT_MAIN = ctk.CTkFont(family="Segoe UI", size=14)
         self.FONT_BOLD = ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
-        self.FONT_SMALL = ctk.CTkFont(family="Segoe UI", size=11)
+        self.FONT_SMALL = ctk.CTkFont(family="Segoe UI", size=10)
         self.FONT_LARGE = ctk.CTkFont(family="Segoe UI", size=24)
-        
+
         # Tech font specifically for the URL and Folder text boxes
-        self.FONT_INPUT = ctk.CTkFont(family="Consolas", size=13)
+        self.FONT_INPUT = ctk.CTkFont(family="Consolas", size=14)
 
         # Version number for easy updates
-        self.VERSION_NUMBER = "v0.1.0"
+        self.VERSION_NUMBER = "v0.1.1"
 
         # Build UI
         self.setup_ui()
@@ -93,14 +108,15 @@ class UniversalDownloader(ctk.CTk):
         # Main Container
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.content_frame.pack(pady=20, padx=20, fill="both", expand=True)
-        self.content_frame.grid_columnconfigure(0, weight=1)    
+        self.content_frame.grid_columnconfigure(0, weight=1)
 
         # --- 1. URL SECTION ---
         self.url_label = ctk.CTkLabel(self.content_frame, text="Media URL", font=self.FONT_BOLD)
         self.url_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
 
         # Container for URL + Floating Paste button
-        self.url_container = ctk.CTkFrame(self.content_frame, fg_color="transparent", border_width=2, border_color=self.BORDER_HIDDEN)
+        self.url_container = ctk.CTkFrame(self.content_frame, fg_color="transparent", border_width=2,
+                                          border_color=self.BORDER_HIDDEN)
         self.url_container.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 20))
         self.url_container.grid_columnconfigure(0, weight=1)
 
@@ -121,16 +137,17 @@ class UniversalDownloader(ctk.CTk):
             self.url_container, text="Paste", width=50, height=36,
             corner_radius=18, bg_color=self.ENTRY_BG, fg_color=self.ACTION_BTN,
             text_color=self.ACTION_TEXT, font=self.FONT_BOLD,
-            hover_color=self.ACTION_HOVER, command=self.paste_url_from_clipboard   
+            hover_color=self.ACTION_HOVER, command=self.paste_url_from_clipboard
         )
         self.paste_btn.place(relx=1.0, rely=0.49, x=-10, y=0, anchor="e")
 
-       # --- 2. FOLDER SECTION ---
+        # --- 2. FOLDER SECTION ---
         self.folder_label = ctk.CTkLabel(self.content_frame, text="Download Location", font=self.FONT_BOLD)
         self.folder_label.grid(row=2, column=0, sticky="w", pady=(0, 5))
 
-        self.folder_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent", border_width=2, border_color=self.BORDER_HIDDEN)
-        self.folder_frame.grid(row=3, column=0, columnspan=2, sticky="we", pady=(0, 20))    
+        self.folder_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent", border_width=2,
+                                         border_color=self.BORDER_HIDDEN)
+        self.folder_frame.grid(row=3, column=0, columnspan=2, sticky="we", pady=(0, 20))
         self.folder_frame.grid_columnconfigure(0, weight=1)
 
         self.folder_entry = ctk.CTkEntry(
@@ -153,26 +170,27 @@ class UniversalDownloader(ctk.CTk):
             hover_color=self.ACTION_HOVER, command=self.select_folder
         )
         self.folder_browse_btn.place(relx=1.0, rely=0.49, x=-10, y=0, anchor="e")
-        
+
         # 3. OPTIONS (Audio Toggle)
         # We style the label text to match the text theme
-        self.audio_label = ctk.CTkLabel(self.content_frame, text="Audio Only", font=self.FONT_BOLD, text_color=self.TEXT_MAIN)
+        self.audio_label = ctk.CTkLabel(self.content_frame, text="Audio Only", font=self.FONT_BOLD,
+                                        text_color=self.TEXT_MAIN)
         self.audio_label.grid(row=4, column=0, sticky="w", pady=(0, 20))
-        
+
         self.audio_switch = ctk.CTkSwitch(
-            self.content_frame, 
-            text="", 
-            switch_width=40,              # Slightly sleeker width
-            switch_height=20,             # Slightly sleeker height
-            fg_color=self.ENTRY_BG,   # Track color when OFF (grey)
-            progress_color=self.ACTION_BTN, # Track color when ON (bright blue)
-            button_color=self.ACTION_BTN, # The thumb (white in light mode, light grey in dark mode)
+            self.content_frame,
+            text="",
+            switch_width=40,  # Slightly sleeker width
+            switch_height=20,  # Slightly sleeker height
+            fg_color=self.ENTRY_BG,  # Track color when OFF (grey)
+            progress_color=self.ACTION_BTN,  # Track color when ON (bright blue)
+            button_color=self.ACTION_BTN,  # The thumb (white in light mode, light grey in dark mode)
             button_hover_color=self.ACTION_HOVER,
-            border_width=3,                     # <--- The new border thickness
+            border_width=3,  # <--- The new border thickness
             border_color=self.ACTION_BTN,
         )
         self.audio_switch.grid(row=4, column=0, sticky="w", padx=(88, 20), pady=(0, 20))
-        
+
         # 4. PROGRESS BAR
         self.progress_bar = ctk.CTkProgressBar(
             self.content_frame,
@@ -190,7 +208,7 @@ class UniversalDownloader(ctk.CTk):
             self.content_frame,
             text="Enter a URL & Location",
             height=50,
-            width=200,
+            width=300,
             corner_radius=25,
             font=self.FONT_BOLD,
             state="disabled",
@@ -200,9 +218,10 @@ class UniversalDownloader(ctk.CTk):
         )
         self.download_btn.configure(command=self.start_download_thread)
         self.download_btn.grid(row=6, column=0, columnspan=2, sticky="s")
-        
+
         # 6. VERSION LABEL
-        self.version_label = ctk.CTkLabel(self, text=self.VERSION_NUMBER, font=self.FONT_SMALL, text_color=self.TEXT_VERSION)
+        self.version_label = ctk.CTkLabel(self, text=self.VERSION_NUMBER, font=self.FONT_SMALL,
+                                          text_color=self.TEXT_VERSION)
         self.version_label.place(relx=0.98, rely=1, anchor="se")
 
         # 6a. Powered By Label
@@ -212,7 +231,7 @@ class UniversalDownloader(ctk.CTk):
             font=self.FONT_SMALL,
             text_color=self.TEXT_VERSION
         )
-        # Position it at the bottom left corner with some padding
+        # Position it in the bottom left corner with some padding
         self.credit_label.place(relx=0.02, rely=1, anchor="sw")
 
     # --- LOGIC METHODS ---
@@ -225,10 +244,10 @@ class UniversalDownloader(ctk.CTk):
             widget.configure(border_color=self.BORDER_HIDDEN)
         else:
             widget.configure(border_color=self.BORDER_DEFAULT)
-
-    def on_folder_btn_leave(self):
-        if self.folder_selection_btn.cget("text") == "Select Download Folder...":
-            self.folder_selection_btn.configure(border_color=self.BORDER_HIDDEN)
+    # unused
+    # def on_folder_btn_leave(self):
+    #     if self.folder_selection_btn.cget("text") == "Select Download Folder...":
+    #         self.folder_selection_btn.configure(border_color=self.BORDER_HIDDEN)
 
     def select_folder(self):
         folder = filedialog.askdirectory()
@@ -245,23 +264,23 @@ class UniversalDownloader(ctk.CTk):
         # If BOTH fields are filled out AND the folder exists
         if url and folder and os.path.isdir(folder):
             self.download_btn.configure(
-                state="normal", 
-                text="Download Now", 
+                state="normal",
+                text="Download Now",
                 fg_color=self.ACTION_BTN,
                 text_color=self.ACTION_TEXT
             )
         else:
             # If they delete the URL or Folder, turn it back to grey
             self.download_btn.configure(
-                state="disabled", 
-                text="Enter a URL & Location", 
+                state="disabled",
+                text="Enter a URL & Location",
                 fg_color=self.BTN_DISABLED,
-                text_color=self.TEXT_DISABLED  
+                text_color=self.TEXT_DISABLED
             )
 
     def show_popup(self, title, message, folder=None):
         self.update_idletasks()
-        
+
         # 1. Match the popup background to the app background
         popup = ctk.CTkToplevel(self, fg_color=self.APP_BG)
         popup.title(title)
@@ -275,9 +294,9 @@ class UniversalDownloader(ctk.CTk):
 
         # 2. Style the text to match main UI text
         label = ctk.CTkLabel(
-            popup, 
-            text=message, 
-            wraplength=350, 
+            popup,
+            text=message,
+            wraplength=350,
             font=self.FONT_MAIN,
             text_color=self.TEXT_MAIN
         )
@@ -289,12 +308,12 @@ class UniversalDownloader(ctk.CTk):
 
         # 3. Primary "OK" Button (Solid Blue)
         btn = ctk.CTkButton(
-            btn_frame, 
-            text="OK", 
-            font=self.FONT_BOLD, 
+            btn_frame,
+            text="OK",
+            font=self.FONT_BOLD,
             width=120,
             height=36,
-            corner_radius=18,                
+            corner_radius=18,
             fg_color=self.ACTION_BTN,
             hover_color=self.ACTION_HOVER,
             text_color=self.ACTION_TEXT,
@@ -305,9 +324,9 @@ class UniversalDownloader(ctk.CTk):
         # 4. Secondary "Open Folder" Button (Ghost Style)
         if folder and os.path.exists(folder):
             open_btn = ctk.CTkButton(
-                btn_frame, 
-                text="Open Folder", 
-                font=self.FONT_BOLD, 
+                btn_frame,
+                text="Open Folder",
+                font=self.FONT_BOLD,
                 width=120,
                 height=36,
                 corner_radius=18,
@@ -326,76 +345,89 @@ class UniversalDownloader(ctk.CTk):
 
     def start_download_thread(self):
         self.download_btn.configure(state="disabled", text="Downloading...")
-        
+
+        # Disable inputs while downloading
+        self.url_entry.configure(state="disabled")
+        self.folder_entry.configure(state="disabled")
+        self.folder_browse_btn.configure(state="disabled")
+        self.paste_btn.configure(state="disabled")
+        self.audio_switch.configure(state="disabled")
+
         # Turn the bar blue and set it to 0% (determinate mode)
         self.progress_bar.configure(mode="determinate", progress_color=self.PROG_FILL)
         self.progress_bar.set(0)
-        
+
         threading.Thread(target=self.download_media, daemon=True).start()
 
     def download_media(self):
         url = self.url_entry.get()
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
+        ffmpeg_path = resource_path("ffmpeg.exe")
 
-        # 1. Point explicitly to BOTH ffmpeg and deno executables
-        if hasattr(sys, '_MEIPASS'):
-            ffmpeg_path = os.path.join(sys._MEIPASS, "assets", "ffmpeg.exe")
-            deno_path = os.path.join(sys._MEIPASS, "assets", "deno.exe")
-        else:
-            ffmpeg_path = os.path.abspath(os.path.join("assets", "ffmpeg.exe"))
-            deno_path = os.path.abspath(os.path.join("assets", "deno.exe"))
-
-        # 2. Update the options
         ydl_opts = {
-            'format': 'bestaudio/best' if is_audio else 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', 
-            'outtmpl': os.path.join(folder, '%(title)s.%(ext)s'),
-            'quiet': True,
-            'noprogress': True,
+            'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+            'restrictfilenames': True,
+            'noplaylist': True,
             'ffmpeg_location': ffmpeg_path,
-            'js_runtimes': {
-                'deno': {'path': deno_path}
-            },
-            'logger': MyLogger(),  # <--- The Fake Terminal!
-            'progress_hooks': [self.download_progress_hook]
+            'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
+            'logger': MyLogger(),
+            'progress_hooks': [self.download_progress_hook],
         }
+
+        if is_audio:
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192'
+            }]
+        else:
+            ydl_opts['merge_output_format'] = 'mp4'
 
         try:
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
-            # Pass the folder here!
             self.after(0, lambda: self.show_popup("Success", "Download Complete!", folder=folder))
         except Exception as e:
             self.after(0, lambda: self.show_popup("Error", "Download Failed."))
         finally:
             self.after(0, self.progress_bar.stop)
-            # Switch back to normal mode and empty the bar
             self.after(0, lambda: self.progress_bar.configure(mode="determinate"))
             self.after(0, lambda: self.progress_bar.set(0))
-            
+
+            # Re-enable inputs
+            self.after(0, lambda: self.url_entry.configure(state="normal"))
+            self.after(0, lambda: self.folder_entry.configure(state="normal"))
+            self.after(0, lambda: self.folder_browse_btn.configure(state="normal"))
+            self.after(0, lambda: self.paste_btn.configure(state="normal"))
+            self.after(0, lambda: self.audio_switch.configure(state="normal"))
             self.after(0, self.validate_inputs)
-    
+
     def download_progress_hook(self, d):
         if d['status'] == 'downloading':
-            # Safely grab the file size (some YouTube videos hide this!)
-            total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+            # 1. Improved size detection
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded = d.get('downloaded_bytes', 0)
-            
-            if total > 0:
+
+            if total:
                 percent = downloaded / total
-                # Force the exact percentage into the UI thread safely
                 self.after(0, lambda p=percent: self.progress_bar.set(p))
+                # Update button text with download speed
+                speed = d.get('_speed_str', 'N/A')
+                self.after(0, lambda s=speed: self.download_btn.configure(text=f"Downloading... ({s})"))
             else:
-                # If YouTube hides the size, just bounce the bar so it doesn't look frozen
-                self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
-                self.after(0, self.progress_bar.start)
-                
+                # Fallback: If size is unknown, use indeterminate mode (bouncing bar)
+                if self.progress_bar.cget("mode") != "indeterminate":
+                    self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
+                    self.after(0, self.progress_bar.start)
+
         elif d['status'] == 'finished':
-            # Download is done! Now ffmpeg merges them.
-            self.after(0, lambda: self.download_btn.configure(text="Merging Video & Audio..."))
+            # 2. Specific 'Merging' feedback
+            self.after(0, self.progress_bar.stop)
             self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
             self.after(0, self.progress_bar.start)
-    
+            self.after(0, lambda: self.download_btn.configure(text="Finalising File..."))
+
     def paste_url_from_clipboard(self):
         try:
             text = self.clipboard_get().strip()
@@ -406,7 +438,7 @@ class UniversalDownloader(ctk.CTk):
             self.url_entry.insert(0, text)
             self.validate_inputs()
 
-        
+
 if __name__ == "__main__":
     app = UniversalDownloader()
     app.mainloop()
