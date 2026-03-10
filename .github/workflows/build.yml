@@ -1,4 +1,4 @@
-name: Build & Release (Multi-OS)
+name: Build & Release (Windows and macOS)
 
 on:
   push:
