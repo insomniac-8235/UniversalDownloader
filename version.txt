@@ -17,13 +17,13 @@ VSVersionInfo(
       StringTable(
         u'040904B0',
         [StringStruct(u'CompanyName', u'David Opasik'),
-        StringStruct(u'FileDescription', u'Universal DownloaderApp (Beta)'),
+        StringStruct(u'FileDescription', u'Universal Downloader'),
         StringStruct(u'FileVersion', u'0.1.0.0'),
         StringStruct(u'InternalName', u'UniversalDownloader'),
         StringStruct(u'LegalCopyright', u'© 2026 David Opasik. All Rights Reserved.'),
         StringStruct(u'OriginalFilename', u'UniversalDownloader.exe'),
         StringStruct(u'ProductName', u'Universal Downloader'),
-        StringStruct(u'ProductVersion', u'0.1-beta')])
+        StringStruct(u'ProductVersion', u'0.1')])
       ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]

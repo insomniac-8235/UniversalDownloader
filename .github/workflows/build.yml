@@ -1,13 +1,12 @@
-name: Build Windows Release
+name: Build Universal Downloader
 
 on:
   push:
-    branches: [ "master" ]  # Matches your branch name
-  pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -19,24 +18,34 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Dependencies
+    - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install customtkinter yt-dlp pyinstaller
+        pip install -r requirements.txt
 
-    - name: Compile Executable with Branding
-      # We use python -m PyInstaller to avoid the "not recognized" error
+    - name: Fetch Missing Binaries (FFmpeg & Deno)
       run: |
-        python -m PyInstaller --noconsole --onefile `
-        --collect-all customtkinter `
-        --icon "assets/icon.ico" `
-        --version-file "version.txt" `
-        --add-data "assets;assets" `
-        --name "UniversalDownloader" `
-        main.py
+        # Create assets folder if it doesn't exist
+        New-Item -ItemType Directory -Force -Path "assets"
+        
+        # 1. Download & Extract Deno
+        Invoke-WebRequest -Uri "https://github.com/denoland/deno/releases/download/v1.41.0/deno-x86_64-pc-windows-msvc.zip" -OutFile "deno.zip"
+        Expand-Archive -Path "deno.zip" -DestinationPath "assets" -Force
+        
+        # 2. Download & Extract FFmpeg (from your yt-dlp link)
+        Invoke-WebRequest -Uri "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
+        Expand-Archive -Path "ffmpeg.zip" -DestinationPath "temp_ffmpeg" -Force
+        
+        # 3. Dig into the extracted FFmpeg folder and move the .exe files to assets
+        Move-Item -Path "temp_ffmpeg\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe" -Destination "assets\ffmpeg.exe" -Force
+        Move-Item -Path "temp_ffmpeg\ffmpeg-master-latest-win64-gpl\bin\ffprobe.exe" -Destination "assets\ffprobe.exe" -Force
 
-    - name: Upload Finished Exe
+    - name: Compile with PyInstaller
+      run: |
+        pyinstaller --name "UniversalDownloader" --noconsole --onefile --windowed --add-data "assets;assets" --icon="assets/icon.ico" --version-file="version.txt" main.py
+
+    - name: Upload Final Executable
       uses: actions/upload-artifact@v4
       with:
-        name: UniversalDownloader-Windows-Build
-        path: dist/UniversalDownloader.exe
+        name: UniversalDownloader-Windows
+        path: dist/*.exe

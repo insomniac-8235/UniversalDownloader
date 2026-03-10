@@ -1,0 +1,21 @@
+# Ignore Virtual Environments
+.venv/
+venv/
+env/
+
+# Ignore Windows Binaries
+assets/*.exe
+
+# Ignore Mac Binaries
+assets/ffmpeg
+assets/ffprobe
+assets/deno
+
+# Ignore PyInstaller Build Folders
+dist/
+build/
+*.spec
+
+# Ignore Python Cache
+__pycache__/
+*.pyc
