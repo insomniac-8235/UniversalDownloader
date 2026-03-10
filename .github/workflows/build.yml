@@ -44,23 +44,25 @@ jobs:
           copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe" ffprobe.exe
 
       - name: Build executable with version info
+        shell: cmd
         run: |
-          python -m PyInstaller --clean --noconsole --onefile ^
-          --collect-all customtkinter ^
-          --collect-all yt_dlp ^
-          --add-data "assets;assets" ^
-          --add-binary "ffmpeg.exe;." ^
-          --add-binary "ffprobe.exe;." ^
-          --icon "assets/icon.ico" ^
-          --version-file "assets/version.py" ^
-          --name "UniversalDownloader_win64" ^
-          main.py
+          python -m PyInstaller --clean --noconsole --onefile `
+            --collect-all customtkinter `
+            --collect-all yt_dlp `
+            --add-data "assets;assets" `
+            --add-binary "ffmpeg.exe;." `
+            --icon "assets/icon.ico" `
+            --version-file "assets/version.py" `
+            --name "UniversalDownloader_win64" `
+            main.py
 
       - name: Rename Windows artifact with version
         id: rename
+        shell: pwsh
         run: |
-          ren dist\UniversalDownloader_win64.exe %APP_NAME%_win64_%VERSION%.exe
-          echo "artifact=dist\%APP_NAME%_win64_%VERSION%.exe" >> $GITHUB_OUTPUT
+          $newName = "${{ env.APP_NAME }}_win64_${{ env.VERSION }}.exe"
+          mv "dist/UniversalDownloader_win64.exe" "dist/$newName"
+          echo "artifact=dist/$newName" >> $env:GITHUB_OUTPUT
 
 
   build-macos:
@@ -83,20 +85,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-          npm install -g create-dmg
 
       - name: Download FFmpeg
         run: |
           curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/getrelease/zip
           unzip -o ffmpeg.zip
-          mv ffmpeg ffmpeg_bin
 
-          curl -L -o ffprobe.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
-          unzip -o ffprobe.zip
-          mv ffmpeg ffprobe
-
-          mv ffmpeg_bin ffmpeg
-          chmod +x ffmpeg ffprobe
+          chmod +x ffmpeg
+          rm ffmpeg.zip
 
       - name: Build macOS app
         run: |
@@ -105,12 +101,12 @@ jobs:
           --collect-all yt_dlp \
           --add-data "assets:assets" \
           --add-binary "ffmpeg:." \
-          --add-binary "ffprobe:." \
           --icon "assets/icon.icns" \
           --name "UniversalDownloader_macOS" \
           main.py
 
       - name: Create DMG
+        id: rename
         run: |
           cd dist
           create-dmg UniversalDownloader_macOS.app \
@@ -121,7 +117,8 @@ jobs:
       - name: Set artifact output
         id: rename
         run: |
-          echo "artifact=dist/${APP_NAME}_macOS_${VERSION}.dmg" >> $GITHUB_OUTPUT
+          hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder dist/UniversalDownloader_macOS.app -ov -format UDZO "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
+          echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
 
 
   release:
