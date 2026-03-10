@@ -64,6 +64,12 @@ jobs:
           mv "dist/UniversalDownloader_win64.exe" "dist/$newName"
           echo "artifact=dist/$newName" >> $env:GITHUB_OUTPUT
 
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bin
+          path: ${{ steps.rename.outputs.artifact }}
+
 
   build-macos:
     name: Build macOS
@@ -110,7 +116,13 @@ jobs:
           hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder dist/UniversalDownloader_macOS.app -ov -format UDZO "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
           echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
 
-  release:
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-bin
+          path: ${{ steps.rename.outputs.artifact }}
+
+release:
     name: Create Release
     needs: [ build-windows, build-macos ]
     runs-on: ubuntu-latest
@@ -121,20 +133,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create Versions File with commit hash
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets  # This puts everything in one folder
+
+      - name: Create Versions File
         run: |
-          TAG=${{ env.VERSION }}
-          COMMIT=$(git rev-parse --short HEAD)
-          echo "Version: $TAG" > versions_${{ env.VERSION }}.txt
-          echo "Commit: $COMMIT" >> versions_${{ env.VERSION }}.txt
+          echo "Version: ${{ env.VERSION }}" > versions_${{ env.VERSION }}.txt
+          echo "Commit: $(git rev-parse --short HEAD)" >> versions_${{ env.VERSION }}.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: Universal Media Downloader ${{ github.ref_name }}
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            ${{ needs.build-windows.outputs.artifact_path }}
-            ${{ needs.build-macos.outputs.artifact_path }}
+            release_assets/windows-bin/*
+            release_assets/macos-bin/*
             versions_${{ env.VERSION }}.txt
