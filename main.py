@@ -257,13 +257,10 @@ class UniversalDownloader(ctk.CTk):
             )
             self.exit_btn.place(relx=1.0, x=0, y=0, anchor="ne")
 
-        # 4. CONTENT AREA (Shifted slightly for Mac Traffic Lights)
-        # On Mac, we add a bit more top padding (20) so the labels don't
-        # sit right under the Red/Yellow/Green buttons.
-        top_padding = 20 if sys.platform == "darwin" else 0
+        # 4. CONTENT AREA ---
 
         self.content_frame = ctk.CTkFrame(self.bg_frame, fg_color="transparent")
-        self.content_frame.pack(pady=(top_padding, 20), padx=20, fill="both", expand=True)
+        self.content_frame.pack(pady=(0, 20), padx=20, fill="both", expand=True)
         self.content_frame.grid_columnconfigure(0, weight=1)
 
         # --- 1. URL SECTION ---
