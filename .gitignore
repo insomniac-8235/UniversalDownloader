@@ -5,6 +5,7 @@ env/
 
 # Ignore Windows Binaries
 assets/*.exe
+dist/*.exe
 
 # Ignore Mac Binaries
 ffmpeg

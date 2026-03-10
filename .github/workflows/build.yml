@@ -4,39 +4,46 @@ on:
   push:
     branches: ["main"]
     tags:
-      - "v*"  # Runs when tags like v0.2.0 are pushed
+      - "v*"  # Matches v0.1.0, v0.1.0-beta, etc.
+
+env:
+  APP_NAME: UniversalDownloader
+  VERSION: ${{ github.ref_name }}  # Git tag version
 
 jobs:
+
   build-windows:
-    name: Windows Build
+    name: Build Windows
     runs-on: windows-latest
-    permissions:
-      contents: write
+    env:
+      VERSION: ${{ github.ref_name }}
+    outputs:
+      artifact_path: ${{ steps.rename.outputs.artifact }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Install FFmpeg via Chocolatey
+      - name: Install FFmpeg
         run: choco install ffmpeg -y
 
-      - name: Copy FFmpeg & FFprobe
+      - name: Copy FFmpeg binaries
         run: |
           copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
           copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe" ffprobe.exe
 
-      - name: Compile Windows Executable
+      - name: Build executable with version info
         run: |
           python -m PyInstaller --clean --noconsole --onefile ^
           --collect-all customtkinter ^
@@ -45,54 +52,53 @@ jobs:
           --add-binary "ffmpeg.exe;." ^
           --add-binary "ffprobe.exe;." ^
           --icon "assets/icon.ico" ^
-          --name "UniversalDownloader_win64_${{ github.ref_name }}" ^
-          "main.py"
+          --version-file "assets/version.py" ^
+          --name "UniversalDownloader_win64" ^
+          main.py
 
-      - name: Create GitHub Release (Windows)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/UniversalDownloader_win64_${{ github.ref_name }}.exe
-          name: Universal Media Downloader ${{ github.ref_name }}
-          generate_release_notes: true
-          fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Rename Windows artifact with version
+        id: rename
+        run: |
+          ren dist\UniversalDownloader_win64.exe %APP_NAME%_win64_%VERSION%.exe
+          echo "artifact=dist\%APP_NAME%_win64_%VERSION%.exe" >> $GITHUB_OUTPUT
+
 
   build-macos:
-    name: macOS Build
+    name: Build macOS
     runs-on: macos-latest
-    permissions:
-      contents: write
+    outputs:
+      artifact_path: ${{ steps.rename.outputs.artifact }}
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          npm install -g create-dmg
 
-      - name: Download & Extract FFmpeg (Intel x86_64 for Rosetta)
+      - name: Download FFmpeg
         run: |
-          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/get/zip
-          curl -L -o ffprobe.zip https://evermeet.cx/ffprobe/get/zip
-
+          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/getrelease/zip
           unzip -o ffmpeg.zip
-          unzip -o ffprobe.zip
+          mv ffmpeg ffmpeg_bin
 
+          curl -L -o ffprobe.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
+          unzip -o ffprobe.zip
+          mv ffmpeg ffprobe
+
+          mv ffmpeg_bin ffmpeg
           chmod +x ffmpeg ffprobe
 
-          rm ffmpeg.zip ffprobe.zip
-
-      - name: Compile macOS App Bundle
+      - name: Build macOS app
         run: |
           python -m PyInstaller --clean --windowed \
           --collect-all customtkinter \
@@ -100,22 +106,47 @@ jobs:
           --add-data "assets:assets" \
           --add-binary "ffmpeg:." \
           --add-binary "ffprobe:." \
-          --name "UniversalDownloader_macOS_${{ github.ref_name }}" \
-          "main.py"
+          --icon "assets/icon.icns" \
+          --name "UniversalDownloader_macOS" \
+          main.py
 
-      - name: Zip the macOS App
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create DMG
         run: |
           cd dist
-          zip -r "UniversalDownloader_macOS_${{ github.ref_name }}.zip" "UniversalDownloader_macOS_${{ github.ref_name }}.app"
+          create-dmg UniversalDownloader_macOS.app \
+            --overwrite \
+            --dmg-title "Universal Downloader ${{ env.VERSION }}" \
+            "${APP_NAME}_macOS_${VERSION}.dmg"
 
-      - name: Upload macOS Release Asset
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Set artifact output
+        id: rename
+        run: |
+          echo "artifact=dist/${APP_NAME}_macOS_${VERSION}.dmg" >> $GITHUB_OUTPUT
+
+
+  release:
+    name: Create Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Create Versions File with commit hash
+        run: |
+          TAG=${VERSION}
+          COMMIT=$(git rev-parse --short HEAD)
+          echo "Version: $TAG" > versions_${VERSION}.txt
+          echo "Commit: $COMMIT" >> versions_${VERSION}.txt
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/UniversalDownloader_macOS_${{ github.ref_name }}.zip
           name: Universal Media Downloader ${{ github.ref_name }}
           generate_release_notes: true
-          fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            ${{ needs.build-windows.outputs.artifact_path }}
+            ${{ needs.build-macos.outputs.artifact_path }}
+            versions_${VERSION}.txt
