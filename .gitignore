@@ -7,9 +7,7 @@ env/
 assets/*.exe
 
 # Ignore Mac Binaries
-assets/ffmpeg
-assets/ffprobe
-assets/deno
+ffmpeg
 
 # Ignore PyInstaller Build Folders
 dist/

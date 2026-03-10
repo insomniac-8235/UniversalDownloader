@@ -6,17 +6,27 @@ import os
 import sys
 
 
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
+def resource_path(relative_path, is_binary=False):
+    """
+    Ultimate Resource Path for v0.2.0
+    - Handles PyInstaller temp folders
+    - Handles Windows .exe extensions automatically
+    - Anchors to script directory during development
+    """
+    if hasattr(sys, '_MEIPASS'):
         base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
 
-    return os.path.join(base_path, relative_path)
+    # Clean up the path for the specific OS
+    path_segments = relative_path.replace("\\", "/").split("/")
 
+    # Handle the binary extension for Windows
+    if is_binary and sys.platform == "win32":
+        if not path_segments[-1].lower().endswith(".exe"):
+            path_segments[-1] += ".exe"
 
+    return os.path.join(base_path, *path_segments)
 
 # --- PYINSTALLER NOCONSOLE FIX ---
 # If the app is compiled without a console, route all print statements to a black hole
@@ -34,7 +44,7 @@ except Exception:
     pass
 
 # Set Appearance
-ctk.set_appearance_mode("System")
+ctk.set_appearance_mode("system")
 ctk.set_default_color_theme("blue")
 ctk.set_widget_scaling(1)  # Forces widgets to render at 100% internal scale
 ctk.set_window_scaling(1)  # Forces the window to render at 100% internal scale
@@ -55,7 +65,7 @@ class UniversalDownloader(ctk.CTk):
 
         # --- WINDOW CONFIG ---
         self.title("Universal Media Downloader")
-        self.geometry("500x400")
+        self.geometry("500x420")
         self.resizable(False, False)
 
         # Set Window Icon (Works in both development and PyInstaller)
@@ -88,27 +98,43 @@ class UniversalDownloader(ctk.CTk):
         self.TEXT_GHOST = ("#666666", "#d4d4d4")  # Placeholder text color
         self.TEXT_VERSION = ("#888888", "#555555")  # Version and credits text
 
-        # --- FONTS (Upgraded) ---
-        # Main UI elements (Buttons, Labels, Switches)
-        self.FONT_MAIN = ctk.CTkFont(family="Segoe UI", size=14)
-        self.FONT_BOLD = ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
-        self.FONT_SMALL = ctk.CTkFont(family="Segoe UI", size=10)
-        self.FONT_LARGE = ctk.CTkFont(family="Segoe UI", size=24)
+        # --- CROSS-PLATFORM FONT DETECTION ---
+        if sys.platform == "darwin":  # macOS
+            MAIN_FONT_FAMILY = ".AppleSystemUIFont"
+            INPUT_FONT_FAMILY = "Menlo"  # Mac's version of Consolas
+        else:  # Windows/Linux
+            MAIN_FONT_FAMILY = "Segoe UI"
+            INPUT_FONT_FAMILY = "Consolas"
 
-        # Tech font specifically for the URL and Folder text boxes
-        self.FONT_INPUT = ctk.CTkFont(family="Consolas", size=14)
+        # --- APPLICATION OF FONTS ---
+        self.FONT_MAIN = ctk.CTkFont(family=MAIN_FONT_FAMILY, size=14)
+        self.FONT_BOLD = ctk.CTkFont(family=MAIN_FONT_FAMILY, size=14, weight="bold")
+        self.FONT_SMALL = ctk.CTkFont(family=MAIN_FONT_FAMILY, size=10)
+        self.FONT_LARGE = ctk.CTkFont(family=MAIN_FONT_FAMILY, size=24)
+        self.FONT_ACTION_BTN = ctk.CTkFont(family=MAIN_FONT_FAMILY, size=18, weight="bold")
+
+        # Tech font for the URL and Folder boxes
+        self.FONT_INPUT = ctk.CTkFont(family=INPUT_FONT_FAMILY, size=13)
 
         # Version number for easy updates
-        self.VERSION_NUMBER = "v0.1.1"
+        self.VERSION_NUMBER = "v0.2.0"
 
         # Build UI
         self.setup_ui()
 
     def setup_ui(self):
-        # Main Container
-        self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.pack(pady=20, padx=20, fill="both", expand=True)
+        # 1. The "Fake" Rounded Window Background
+        self.bg_frame = ctk.CTkFrame(self, fg_color=self.APP_BG)
+        self.bg_frame.pack(fill="both", expand=True)
+
+        # 3. MAIN CONTAINER (Parent is also self.bg_frame!)
+        self.content_frame = ctk.CTkFrame(self.bg_frame, fg_color="transparent")
+        self.content_frame.pack(pady=(20, 20), padx=20, fill="both", expand=True)
         self.content_frame.grid_columnconfigure(0, weight=1)
+        # # Main Container
+        # self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
+        # self.content_frame.pack(pady=20, padx=20, fill="both", expand=True)
+        # self.content_frame.grid_columnconfigure(0, weight=1)
 
         # --- 1. URL SECTION ---
         self.url_label = ctk.CTkLabel(self.content_frame, text="Media URL", font=self.FONT_BOLD)
@@ -186,7 +212,7 @@ class UniversalDownloader(ctk.CTk):
             progress_color=self.ACTION_BTN,  # Track color when ON (bright blue)
             button_color=self.ACTION_BTN,  # The thumb (white in light mode, light grey in dark mode)
             button_hover_color=self.ACTION_HOVER,
-            border_width=3,  # <--- The new border thickness
+            border_width=2,  # <--- The new border thickness
             border_color=self.ACTION_BTN,
         )
         self.audio_switch.grid(row=4, column=0, sticky="w", padx=(88, 20), pady=(0, 20))
@@ -210,29 +236,35 @@ class UniversalDownloader(ctk.CTk):
             height=50,
             width=300,
             corner_radius=25,
-            font=self.FONT_BOLD,
+            font=self.FONT_ACTION_BTN,
             state="disabled",
             fg_color=self.BTN_DISABLED,
-            hover_color=self.ACTION_HOVER,
             text_color_disabled=self.TEXT_DISABLED
         )
         self.download_btn.configure(command=self.start_download_thread)
         self.download_btn.grid(row=6, column=0, columnspan=2, sticky="s")
 
         # 6. VERSION LABEL
-        self.version_label = ctk.CTkLabel(self, text=self.VERSION_NUMBER, font=self.FONT_SMALL,
-                                          text_color=self.TEXT_VERSION)
-        self.version_label.place(relx=0.98, rely=1, anchor="se")
+        self.version_label = ctk.CTkLabel(
+            self.bg_frame,  # <--- Changed from self to self.bg_frame
+            text=self.VERSION_NUMBER,
+            font=self.FONT_SMALL,
+            text_color=self.TEXT_VERSION,
+            bg_color="transparent"  # Forces it to blend seamlessly
+        )
+        # Pulled 20px in from the right, 14px up from the bottom
+        self.version_label.place(relx=1.0, rely=1.0, x=-20, y=-5, anchor="se")
 
         # 6a. Powered By Label
         self.credit_label = ctk.CTkLabel(
-            self,
+            self.bg_frame,  # <--- Changed from self to self.bg_frame
             text="Powered by yt-dlp",
             font=self.FONT_SMALL,
-            text_color=self.TEXT_VERSION
+            text_color=self.TEXT_VERSION,
+            bg_color="transparent"
         )
-        # Position it in the bottom left corner with some padding
-        self.credit_label.place(relx=0.02, rely=1, anchor="sw")
+        # Pulled 20px in from the left, 14px up from the bottom
+        self.credit_label.place(x=20, rely=1.0, y=-5, anchor="sw")
 
     # --- LOGIC METHODS ---
 
@@ -244,10 +276,6 @@ class UniversalDownloader(ctk.CTk):
             widget.configure(border_color=self.BORDER_HIDDEN)
         else:
             widget.configure(border_color=self.BORDER_DEFAULT)
-    # unused
-    # def on_folder_btn_leave(self):
-    #     if self.folder_selection_btn.cget("text") == "Select Download Folder...":
-    #         self.folder_selection_btn.configure(border_color=self.BORDER_HIDDEN)
 
     def select_folder(self):
         folder = filedialog.askdirectory()
@@ -363,7 +391,23 @@ class UniversalDownloader(ctk.CTk):
         url = self.url_entry.get()
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
-        ffmpeg_path = resource_path("ffmpeg.exe")
+        # 1. Use your new ultimate path function!
+        ffmpeg_path = resource_path("ffmpeg", is_binary=True)
+
+        # --- DIAGNOSTIC X-RAY ---
+        print(f"\n--- FFMPEG DIAGNOSTICS ---")
+        print(f"Looking for FFmpeg at: {ffmpeg_path}")
+        print(f"Does the file exist? {os.path.exists(ffmpeg_path)}")
+        if os.path.exists(ffmpeg_path):
+            print(f"Is it executable? {os.access(ffmpeg_path, os.X_OK)}")
+        print(f"--------------------------\n")
+        # ... (keep your chmod logic here) ...
+        if sys.platform != "win32" and os.path.exists(ffmpeg_path):
+            try:
+                import stat
+                os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)
+            except Exception as e:
+                print(f"Permission setup failed: {e}")
 
         ydl_opts = {
             'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
@@ -438,6 +482,21 @@ class UniversalDownloader(ctk.CTk):
             self.url_entry.insert(0, text)
             self.validate_inputs()
 
+    # --- WINDOW MOVEMENT LOGIC ---
+    def start_move(self, event):
+        # Record the exact X/Y of the mouse when the user clicks
+        self.click_x = event.x
+        self.click_y = event.y
+
+    def do_move(self, event):
+        # Calculate how far the mouse has moved
+        deltax = event.x - self.click_x
+        deltay = event.y - self.click_y
+
+        # Apply the movement to the window's position on the screen
+        x = self.winfo_x() + deltax
+        y = self.winfo_y() + deltay
+        self.geometry(f"+{x}+{y}")
 
 if __name__ == "__main__":
     app = UniversalDownloader()

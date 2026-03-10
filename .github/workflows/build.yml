@@ -1,14 +1,14 @@
-name: Build & Release  # The overall workflow name
+name: Build & Release (Multi-OS v0.2.0)
 
 on:
   push:
     branches: [ "main" ]
     tags:
-      - 'v*'
+      - 'v*'  # Triggers automatically on tags like v0.2.0, v0.2.1-beta, etc.
 
 jobs:
-  build-windows: # This specific job handles Windows
-    name: Windows Build
+  build-windows:
+    name: Windows Build (Python 3.14)
     runs-on: windows-latest
     permissions:
       contents: write
@@ -20,45 +20,97 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.14'
 
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pyinstaller
 
-    - name: Install FFmpeg
-      run: |
-        choco install ffmpeg -y
+    - name: Install FFmpeg via Chocolatey
+      run: choco install ffmpeg -y
 
-    - name: Copy FFmpeg
-      run: |
-        copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
-
-    - name: Copy Engines
+    - name: Copy FFmpeg & FFprobe
       run: |
         copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
         copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe" ffprobe.exe
 
-    - name: Compile Executable
+    - name: Compile Windows Executable
       run: |
         python -m PyInstaller --clean --noconsole --onefile `
         --collect-all customtkinter `
         --collect-all yt_dlp `
-        --icon "assets/icon.ico" `
         --add-data "assets;assets" `
         --add-binary "ffmpeg.exe;." `
         --add-binary "ffprobe.exe;." `
         --name "UniversalDownloader_win64_${{ github.ref_name }}" `
         "main.py"
 
-    - name: Create GitHub Release
+    - name: Create GitHub Release (Windows)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: dist/UniversalDownloader_win64_${{ github.ref_name }}.exe
         name: "Universal Media Downloader ${{ github.ref_name }}"
-        prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: macOS Build (Intel/Rosetta - Python 3.14)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.14'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Download & Extract FFmpeg (Intel x86_64 for Rosetta)
+      run: |
+        curl -L -o ffmpeg-mac.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macOS-x86_64-gpl.zip
+        unzip ffmpeg-mac.zip
+        mv ffmpeg-master-latest-macOS-x86_64-gpl/bin/ffmpeg ./ffmpeg
+        mv ffmpeg-master-latest-macOS-x86_64-gpl/bin/ffprobe ./ffprobe
+        chmod +x ./ffmpeg ./ffprobe
+        rm -rf ffmpeg-master-latest-macOS-x86_64-gpl ffmpeg-mac.zip
+
+    - name: Compile macOS App Bundle
+      run: |
+        python -m PyInstaller --clean --windowed \
+        --collect-all customtkinter \
+        --collect-all yt_dlp \
+        --add-data "assets:assets" \
+        --add-binary "ffmpeg:." \
+        --add-binary "ffprobe:." \
+        --name "UniversalDownloader_macOS_${{ github.ref_name }}" \
+        "main.py"
+
+    - name: Zip the macOS App
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        cd dist
+        zip -r "UniversalDownloader_macOS_${{ github.ref_name }}.zip" "UniversalDownloader_macOS_${{ github.ref_name }}.app"
+
+    - name: Create GitHub Release (macOS)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        # Appends to the same release created by the Windows job
+        files: dist/UniversalDownloader_macOS_${{ github.ref_name }}.zip
+        name: "Universal Media Downloader ${{ github.ref_name }}"
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

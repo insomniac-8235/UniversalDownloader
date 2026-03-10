@@ -6,7 +6,7 @@
 # Universal Media Downloader
 A powerful, easy-to-use GUI for downloading media from various platforms. A standalone, high-performance media archiving utility for Windows. This project was built as an educational exercise to explore Python GUI development, asynchronous threading, and the integration of external command-line binaries (`yt-dlp`, FFmpeg, Deno) into a single compiled executable.
 
-## 🚀 Download
+## Download
 Click the link below to get the latest stable version for Windows:
 
 [**Download Latest Windows Executable (win64)**](https://github.com/insomniac-8235/UniversalDownloader/releases/latest)
