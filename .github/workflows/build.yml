@@ -112,12 +112,15 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-windows, build-macos]
+    needs: [ build-windows, build-macos ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Create Versions File with commit hash
         run: |
           TAG=${VERSION}
