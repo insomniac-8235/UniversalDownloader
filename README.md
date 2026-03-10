@@ -1,7 +1,29 @@
-#  Universal Media Downloader
-**v0.1.0** | Educational Project & Python Showcase
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/insomniac-8235/UniversalDownloader)
+![GitHub top language](https://img.shields.io/github/languages/top/insomniac-8235/UniversalDownloader)
+![GitHub last commit](https://img.shields.io/github/last-commit/insomniac-8235/UniversalDownloader)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/insomniac-8235/UniversalDownloader/build.yml)
 
-A standalone, high-performance media archiving utility for Windows. This project was built as an educational exercise to explore Python GUI development, asynchronous threading, and the integration of external command-line binaries (`yt-dlp`, FFmpeg, Deno) into a single compiled executable.
+# Universal Media Downloader
+A powerful, easy-to-use GUI for downloading media from various platforms. A standalone, high-performance media archiving utility for Windows. This project was built as an educational exercise to explore Python GUI development, asynchronous threading, and the integration of external command-line binaries (`yt-dlp`, FFmpeg, Deno) into a single compiled executable.
+
+## 🚀 Download
+Click the link below to get the latest stable version for Windows:
+
+[**Download Latest Windows Executable (win64)**](https://github.com/insomniac-8235/UniversalDownloader/releases/latest)
+
+---
+
+## Features
+* **Simple GUI:** Built with CustomTkinter for a modern look.
+* **High Quality:** Powered by `yt-dlp` for the best available resolution.
+* **Portable:** No installation required—just run the `.exe`.
+
+---
+
+## How to Use
+1.  Download the `UniversalDownloader_win64_v0.1.0.exe` from the Releases page.
+2.  Double-click to run (Windows may show a "SmartScreen" warning; click 'More Info' -> 'Run Anyway' since it's an unsigned app).
+3.  Paste your link and hit Download!
 
 ---
 
@@ -13,51 +35,7 @@ A standalone, high-performance media archiving utility for Windows. This project
 
 ---
 
-##  Installation & Usage
-
-### For Users
-1. Go to the **Actions** tab in this repository.
-2. Select the latest successful build under "Build Universal Downloader".
-3. Download the `UniversalDownloader-Windows.zip` artifact at the bottom of the run summary.
-4. Extract and run `UniversalDownloader.exe` (No installation required).
-
----
-
-##  Developer Setup
-
-If cloning this repository to review or modify the code locally, you must provide your own binaries, as large `.exe` files are intentionally ignored by Git.
-
-1. Clone the repo: 
-   ```bash
-   git clone [https://github.com/insomniac-8235/Universal-Downloader.git](https://github.com/insomniac-8235/Universal-Downloader.git)
-
-2. Create a virtual environment and install requirements:
-    ```bash
-    pip install -r requirements.txt
-
-3. **⚠️ Crucial Binary Step:** * Download the Windows builds for `ffmpeg.exe`, `ffprobe.exe`, and `deno.exe`.
-        * Place all three executables directly into the `assets/` folder.
-
-
-4. Run the script:
-    ```bash
-    python main.py
----
-
-##  CI/CD Build Logic
-
-This project uses **GitHub Actions** to automate the build pipeline. On every push to the `main` branch, the workflow automatically spins up a Windows runner, fetches the necessary unversioned binaries via PowerShell, and compiles the final `.exe`.
-
-To build the executable manually on a local Windows machine:
-
-```bash
-pyinstaller --noconsole --onefile --windowed --add-data "assets;assets" --icon="assets/icon.ico" --version-file="version.txt" main.py
-```
-
----
-
 ##  Core Technologies
-
 * **Engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 * **UI Framework:** [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
 * **Media Merging:** [FFmpeg](https://ffmpeg.org/)
