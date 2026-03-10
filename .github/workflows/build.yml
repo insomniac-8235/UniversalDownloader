@@ -49,3 +49,22 @@ jobs:
       with:
         name: UniversalDownloader-Windows
         path: dist/*.exe
+
+    - name: Create Release and Upload Asset
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: dist/UniversalDownloader.exe
+        tag_name: v0.1.0
+        name: Universal Media Downloader v0.1.0
+        body: |
+          ### First Official Release
+          This project is an educational showcase of a standalone media downloader.
+           
+          **Key Technical Features:**
+          * Built-in **ffmpeg** for high-quality merging.
+          * **Deno** runtime integration for anti-bot bypassing.
+          * Multi-threaded **CustomTkinter** UI.
+          * Single-file portable executable.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
