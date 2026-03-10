@@ -123,10 +123,10 @@ jobs:
 
       - name: Create Versions File with commit hash
         run: |
-          TAG=${VERSION}
+          TAG=${{ env.VERSION }}
           COMMIT=$(git rev-parse --short HEAD)
-          echo "Version: $TAG" > versions_${VERSION}.txt
-          echo "Commit: $COMMIT" >> versions_${VERSION}.txt
+          echo "Version: $TAG" > versions_${{ env.VERSION }}.txt
+          echo "Commit: $COMMIT" >> versions_${{ env.VERSION }}.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -137,4 +137,4 @@ jobs:
           files: |
             ${{ needs.build-windows.outputs.artifact_path }}
             ${{ needs.build-macos.outputs.artifact_path }}
-            versions_${VERSION}.txt
+            versions_${{ env.VERSION }}.txt
