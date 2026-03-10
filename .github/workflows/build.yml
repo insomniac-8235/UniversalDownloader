@@ -53,7 +53,6 @@ jobs:
             --add-data "assets;assets" `
             --add-binary "ffmpeg.exe;." `
             --icon "assets/icon.ico" `
-            --version-file "assets/version.py" `
             --name "UniversalDownloader_win64" `
             main.py
 
@@ -119,6 +118,9 @@ jobs:
       contents: write
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - name: Checkout repository
+      - uses: actions/checkout@v4
+
       - name: Create Versions File with commit hash
         run: |
           TAG=${VERSION}
