@@ -2,9 +2,11 @@ name: Build Windows Release
 
 on:
   push:
-    branches: [ "master" ]  # Matches your branch name
+    branches: [ "main" ]
+    tags:
+      - '*'
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -24,19 +26,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install customtkinter yt-dlp pyinstaller
 
-    - name: Compile Executable with Branding
-      # We use python -m PyInstaller to avoid the "not recognized" error
+    - name: Compile Executable
       run: |
         python -m PyInstaller --noconsole --onefile `
         --collect-all customtkinter `
         --icon "assets/icon.ico" `
         --version-file "version.txt" `
         --add-data "assets;assets" `
-        --name "UniversalDownloader" `
+        --name "UniversalDownloader_win64_${{ github.ref_name }}" `
         main.py
 
-    - name: Upload Finished Exe
-      uses: actions/upload-artifact@v4
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
       with:
-        name: UniversalDownloader-Windows-Build
-        path: dist/UniversalDownloader.exe
+        files: dist/UniversalDownloader_win64_${{ github.ref_name }}.exe
+        name: "Universal Media Downloader ${{ github.ref_name }}"
+        prerelease: true
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
