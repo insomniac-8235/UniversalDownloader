@@ -142,29 +142,6 @@ class UniversalDownloader(ctk.CTk):
         self.bg_frame = ctk.CTkFrame(self, fg_color=self.APP_BG, corner_radius=0)
         self.bg_frame.pack(fill="both", expand=True)
 
-        # 2. THE DRAG SLITHER (Sized to 32px standard)
-        self.title_bar = ctk.CTkFrame(self.bg_frame, fg_color="transparent", height=32)
-        self.title_bar.pack(fill="x", side="top")
-        self.title_bar.pack_propagate(False)
-
-        self.title_bar.bind("<ButtonPress-1>", self.start_move)
-        self.title_bar.bind("<B1-Motion>", self.do_move)
-
-        # 3. THE EXIT BUTTON (Windows ONLY)
-        if sys.platform == "win32":
-            self.exit_btn = ctk.CTkButton(
-                self.title_bar,
-                text=self.CLOSE_ICON,
-                font=self.ICON_FONT,
-                width=46, height=32,
-                corner_radius=0,
-                fg_color="transparent",
-                hover_color="#c42b1c",
-                text_color=("#333333", "#ffffff"),
-                command=self.destroy
-            )
-            self.exit_btn.place(relx=1.0, x=0, y=0, anchor="ne")
-
         # 4. CONTENT AREA ---
         self.content_frame = ctk.CTkFrame(self.bg_frame, fg_color="transparent")
         self.content_frame.pack(pady=(0, 20), padx=20, fill="both", expand=True)
@@ -275,7 +252,7 @@ class UniversalDownloader(ctk.CTk):
             text_color_disabled=self.TEXT_DISABLED
         )
         self.download_btn.configure(command=self.start_download_thread)
-        self.download_btn.grid(row=6, column=0, columnspan=2, sticky="s")
+        self.download_btn.grid(row=6, column=0, sticky="s")
 
         # 6. VERSION LABEL
         self.version_label = ctk.CTkLabel(
@@ -352,23 +329,19 @@ class UniversalDownloader(ctk.CTk):
             self.after(0, self.unlock_ui)
 
         except Exception as e:
-            self.after(0, lambda: self.show_popup(
-                "Download Failed!",
-                success=False,
-                error_detail=str(e)
-            ))
+        # self.after(0, lambda: self.show_popup("Download Failed!", success=False, error_detail=str(e)))
             self.progress_bar.stop()
             self.progress_bar.set(0)
             self.unlock_ui()
-    finally:
-        self.downloading = False
+        finally:
+            self.downloading = False
 
     def validate_inputs(self, event=None):
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
 
         if url and folder and os.path.isdir(folder):
-            if self.download_btn.cget("text") not in ("Downloading...", "Finalising File..."):
+            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
                 self.download_btn.configure(
                     state="normal",
                     text="Download Now",
@@ -377,7 +350,7 @@ class UniversalDownloader(ctk.CTk):
                     text_color=self.ACTION_TEXT
                 )
         else:
-            if self.download_btn.cget("text") not in ("Downloading...", "Finalising File..."):
+            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
                 self.download_btn.configure(
                     state="disabled",
                     text="Enter a URL & Location",
@@ -390,11 +363,11 @@ class UniversalDownloader(ctk.CTk):
         if self.downloading:
             return
 
-        # Update button to "Finalising..."
-        self.download_btn.configure(text="Finalising...", state="disabled")
+        # Update button to "Downloading..."
+        self.download_btn.configure(text="Downloading...", state="disabled")
         
         self.downloading = True
-        self.lock_ui("Finalising...")
+        self.lock_ui("Downloading...")
         
         # Set progress bar to indeterminate mode and start
         self.progress_bar.configure(mode="indeterminate")
