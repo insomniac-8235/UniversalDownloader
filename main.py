@@ -450,22 +450,32 @@ class UniversalDownloader(ctk.CTk):
                                                                                                                            
             if total:                                                                                                      
                 # Use determinate mode if total bytes are known                                                            
-                percent = downloaded / total                                                                               
-                self.progress_bar.set(f"Download {percent:.1f}%")                                                          
+                progress_percent = min(int((float(downloaded) / total) * 100), 100)
+                if total > 10**12:
+                    totalGB = total / (10**12)
+                    downloadedGB = downloaded / (10**12)
+                    progress = f"Download {progress_percent}% of {totalGB:.2f}GB"
+                elif total > 10**9:
+                    totalGB = total / (10**9)
+                    downloadedGB = downloaded / (10**9)
+                    progress = f"Download {progress_percent}% of {totalGB:.2f}GB"
+                elif total > 10**6:
+                    totalMB = total / (10**6)
+                    downloadedMB = downloaded / (10**6)
+                    progress = f"Download {progress_percent}% of {totalMB:.2f}MB"
+                elif total > 10**3:
+                    totalKB = total / (10**3)
+                    downloadedKB = downloaded / (10**3)
+                    progress = f"Download {progress_percent}% of {totalKB:.2f}KB"
+                else:
+                    progress = f"Download {progress_percent}% of {total}B"
             else:                                                                                                          
                 # Switch to indeterminate mode if total bytes are unknown                                                  
                 self.progress_bar.configure(mode="indeterminate")                                                          
                 self.progress_bar.start()                                                                                  
                                                                                                                            
-            # Update speed and time if available                                                                           
-            try:                                                                                                           
-                speed = d.get('speed')                                                                                     
-                time = d.get('time')                                                                                       
-                if speed and time:                                                                                         
-                    # Update progress bar based on time estimate if available                                              
-                    self.progress_bar.set(float(d['progress']))                                                            
-            except KeyError:                                                                                               
-                pass                                                                                                       
+            # Update progress bar                                                                                           
+            self.progress_bar.set(progress_percent)                                                                         
                                                                                                                            
         elif d['status'] == 'postprocessing':                                                                              
             # Handle postprocessing progress                                                                               
