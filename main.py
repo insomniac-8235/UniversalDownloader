@@ -235,21 +235,12 @@ class UniversalDownloader(ctk.CTk):
             fg_color=self.ENTRY_BG,
             progress_color=self.PROG_FILL,
             corner_radius=8,
-            mode="determinate"
+            mode="indeterminate"
         )
         self.progress_bar.set(0)
         self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 20))
 
-        # 5. ADD SPEED LABEL
-        self.speed_label = ctk.CTkLabel(
-            self.content_frame,
-            text="Speed: 0.0 Mbps",
-            font=self.FONT_SMALL,
-            text_color=self.TEXT_MAIN
-        )
-        self.speed_label.grid(row=6, column=0, columnspan=2, sticky="we", pady=(0, 20))
-
-        # 6. MAIN ACTION BUTTON
+        # 5. MAIN ACTION BUTTON
         self.download_btn = ctk.CTkButton(
             self.content_frame,
             text="Enter a URL & Location",
@@ -264,7 +255,7 @@ class UniversalDownloader(ctk.CTk):
         self.download_btn.configure(command=self.start_download_thread)
         self.download_btn.grid(row=7, column=0, sticky="s")
 
-        # 7. VERSION LABEL
+        # 6. VERSION LABEL
         self.version_label = ctk.CTkLabel(
             self.bg_frame,
             font=self.FONT_SMALL,
@@ -446,7 +437,6 @@ class UniversalDownloader(ctk.CTk):
 
         self.progress_bar.stop()
         self.progress_bar.set(0)
-        self.speed_label.configure(text="Speed: 0.0 Mbps")
 
         self.downloading = False
         self.validate_inputs()
