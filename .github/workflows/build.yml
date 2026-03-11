@@ -147,6 +147,12 @@ jobs:
 
           echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
 
+      - name: Rename macOS artifact with version
+        id: rename
+        run: |
+          mv "${{ env.APP_NAME }}_macOS_beta.dmg" "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
+          echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
+
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
