@@ -567,37 +567,47 @@ class UniversalDownloader(ctk.CTk):
         self.validate_inputs()
 
     def download_progress_hook(self, d):
-        if d['status'] == 'downloading':
-            # Calculate progress percentage
-            total = d.get('total_bytes') or d.get('total_bytes_estimate')
-            downloaded = d.get('downloaded_bytes', 0)
-            if total:
-                percent = downloaded / total
-                self.after(0, lambda: self.progress_bar.set(percent))
-            else:
-                # Fallback to time-based estimation if total bytes are unavailable
+        try:
+            if d['status'] == 'downloading':
+                # Calculate progress percentage
+                total = d.get('total_bytes') or d.get('total_bytes_estimate')
+                downloaded = d.get('downloaded_bytes', 0)
+                
+                if total:
+                    percent = downloaded / total
+                    self.after(0, lambda: self.progress_bar.set(percent))
+                else:
+                    # Fallback to time-based estimation if total bytes are unavailable
+                    try:
+                        time_left = d['time']
+                        progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
+                        self.after(0, lambda: self.progress_bar.set(progress))
+                    except KeyError:
+                        pass
+                
+                # Update speed and time if available
                 try:
-                    time_left = d['time']
-                    progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
-                    self.after(0, lambda: self.progress_bar.set(progress))
+                    speed = d.get('speed')
+                    time = d.get('time')
+                    if speed and time:
+                        # Update progress bar based on time estimate if available
+                        self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
                 except KeyError:
                     pass
-            # Update speed and time if available
-            try:
-                speed = d.get('speed')
-                time = d.get('time')
-                if speed and time:
-                    # You can update the label with these values if needed
-                    self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
-            except KeyError:
-                pass
-        elif d['status'] == 'postprocessing':
-            # Handle postprocessing progress
-            progress = d.get('progress', 0)
-            self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
-        elif d['status'] == 'finished':
-            self.after(0, lambda: self.progress_bar.set(1.0))
-            self.after(0, self.unlock_ui)
+                
+            elif d['status'] == 'postprocessing':
+                # Handle postprocessing progress
+                progress = d.get('progress', 0)
+                self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
+                
+            elif d['status'] == 'finished':
+                # Stop the progress bar and reset when download completes
+                self.after(0, lambda: self.progress_bar.stop())
+                self.after(0, lambda: self.progress_bar.set(1.0))
+                self.after(0, self.unlock_ui)
+                
+        except Exception as e:
+            print(f"Progress hook error: {e}")  # Debug print
 
     def show_popup(self, message, folder=None, success=True, error_detail=None):
         # Set popup appearance mode to match main window
