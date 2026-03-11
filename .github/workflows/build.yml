@@ -41,8 +41,13 @@ jobs:
       - name: Copy FFmpeg binaries
         shell: pwsh
         run: |
-          copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe" ffmpeg.exe
-          copy "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe" ffprobe.exe
+          $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
+          Copy-Item $ff ffmpeg.exe
+
+      - name: Generate UI Commit File
+        shell: bash
+        run: |
+          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
 
       - name: Build executable with version info
         shell: pwsh
@@ -92,12 +97,26 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Download FFmpeg
+      - name: Install FFmpeg
         run: |
-          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/getrelease/zip
-          unzip -o ffmpeg.zip
+          brew install ffmpeg
+
+      - name: Copy FFmpeg binary
+        run: |
+          FF=$(which ffmpeg)
+          echo "FFmpeg path: $FF"
+          cp "$FF" ./ffmpeg
           chmod +x ffmpeg
-          rm ffmpeg.zip
+          ls -lah ffmpeg
+
+      - name: Generate UI Commit File
+        shell: bash
+        run: |
+          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+
+      - name: Verify FFmpeg
+        run: |
+          ./ffmpeg -version
 
       - name: Build macOS app
         run: |

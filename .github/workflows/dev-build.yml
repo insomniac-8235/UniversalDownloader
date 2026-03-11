@@ -1,0 +1,126 @@
+name: Dev Build
+
+on:
+  push:
+    branches: ["main"]
+    tags-ignore:
+      - "v*" # Prevents this from running when you do a real release
+
+env:
+  APP_NAME: UniversalDownloader
+  VERSION: beta # Fixed version string for dev builds
+
+jobs:
+  build-windows:
+    name: Build Windows (Dev)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install FFmpeg
+        run: choco install ffmpeg -y
+
+      - name: Copy FFmpeg binary
+        shell: pwsh
+        run: |
+          $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
+          Copy-Item $ff ffmpeg.exe
+
+      - name: Generate UI Commit File
+        shell: bash
+        run: |
+          mkdir -p assets
+          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+
+      - name: Build Executable
+        shell: pwsh
+        run: |
+          python -m PyInstaller --clean --noconsole --onefile `
+            --collect-all customtkinter `
+            --collect-all yt_dlp `
+            --add-data "assets;assets" `
+            --add-binary "ffmpeg.exe;." `
+            --icon "assets/icon.ico" `
+            --name "${{ env.APP_NAME }}_win64_beta" `
+            main.py
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-dev-build
+          path: dist/${{ env.APP_NAME }}_win64_beta.exe
+
+  build-macos:
+    name: Build macOS (Dev)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install FFmpeg (Homebrew)
+        run: |
+          brew install ffmpeg
+
+      - name: Copy FFmpeg binary
+        run: |
+          FF=$(which ffmpeg)
+          cp "$FF" ./ffmpeg
+          chmod +x ffmpeg
+
+      - name: Generate UI Commit File
+        shell: bash
+        run: |
+          mkdir -p assets
+          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+
+      - name: Build macOS app
+        run: |
+          python -m PyInstaller --clean --windowed \
+            --collect-all customtkinter \
+            --collect-all yt_dlp \
+            --add-data "assets:assets" \
+            --add-binary "ffmpeg:." \
+            --icon "assets/icon.icns" \
+            --name "${{ env.APP_NAME }}_macOS_beta" \
+            main.py
+
+      - name: Create DMG with Applications Shortcut
+        id: rename
+        run: |
+          # 1. Create a temporary staging directory
+          mkdir -p dist/dmg_staging
+          
+          # 2. Copy the .app into the staging folder
+          cp -R "dist/UniversalDownloader_macOS.app" dist/dmg_staging/
+          
+          # 3. Create the symbolic link to /Applications
+          ln -s /Applications dist/dmg_staging/Applications
+          
+          # 4. Create the DMG from the staging folder
+          hdiutil create -volname "${{ env.APP_NAME }}" \
+                         -srcfolder dist/dmg_staging \
+                         -ov -format UDZO \
+                         "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
+          
+          echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT

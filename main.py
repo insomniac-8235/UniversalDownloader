@@ -35,6 +35,11 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
+# make sure ffmpeg binary used when frozen
+if getattr(sys, "frozen", False):
+    ffmpeg_path = os.path.join(sys._MEIPASS, "ffmpeg")
+else:
+    ffmpeg_path = "ffmpeg"
 
 # Set Appearance
 ctk.set_appearance_mode("system")
@@ -372,14 +377,15 @@ class UniversalDownloader(ctk.CTk):
         self.download_btn.grid(row=6, column=0, columnspan=2, sticky="s")
 
         # 6. VERSION LABEL
+
         self.version_label = ctk.CTkLabel(
             self.bg_frame,  # <--- Changed from self to self.bg_frame
-            text=self.VERSION_NUMBER,
             font=self.FONT_SMALL,
             text_color=self.TEXT_VERSION,
             bg_color="transparent"  # Forces it to blend seamlessly
         )
         self.version_label.place(relx=1.0, rely=1.0, x=-20, y=-5, anchor="se")
+        self.version_label.configure(text=self.get_build_info())
 
         # 6a. Powered By Label
         self.credit_label = ctk.CTkLabel(
@@ -714,6 +720,18 @@ class UniversalDownloader(ctk.CTk):
 
         except Exception as e:
             print("Mica failed:", e)
+
+    def get_build_info(self):
+        """Combines Version Number and Git Commit for the UI."""
+        version = "v0.2.1"  # Manually update this here for each release
+        try:
+            path = get_resource_path("assets/commit.txt")
+            with open(path, "r") as f:
+                commit = f.read().strip()
+            return f"{version} ({commit})"
+        except Exception:
+            # Fallback for local development
+            return f"{version} (Dev)"
 
 
 if __name__ == "__main__":
