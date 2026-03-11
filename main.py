@@ -362,7 +362,7 @@ class UniversalDownloader(ctk.CTk):
                     state="disabled",                                                                                      
                     text="Enter a URL & Location",                                                                         
                     fg_color=self.BTN_DISABLED,                                                                            
-                    hover_color=self.BTN_HOVER,                                                                            
+                    hover_color=self.ACTION_HOVER,                                                                                 
                     text_color_disabled=self.TEXT_DISABLED                                                                 
                 )                                                                                                          
                                                                                                                            
