@@ -299,7 +299,9 @@ class UniversalDownloader(ctk.CTk):
             raise                                                                                                          
                                                                                                                            
     def download_media(self):                                                                                              
-        try:                                                                                                               
+        try:
+             # Store the total bytes before starting the download  
+            self._total_bytes = 0                                                                                                                 
             ffmpeg_path = self.setup_ffmpeg()                                                                              
                                                                                                                            
             url = self.url_entry.get().strip()                                                                             
@@ -327,21 +329,24 @@ class UniversalDownloader(ctk.CTk):
                                                                                                                            
             with YoutubeDL(ydl_opts) as ydl:                                                                               
                 ydl.download([url])                                                                                        
-                                                                                                                           
-            self.after(0, self.show_popup)                                                                                 
-            self.after(0, self.unlock_ui)                                                                                  
-                                                                                                                           
-        except Exception as e:                                                                                             
-            self.after(0, lambda: self.show_popup(                                                                         
-                "Download Failed!",                                                                                        
-                success=False,                                                                                             
-                error_detail=str(e)                                                                                        
-            ))                                                                                                             
-            self.progress_bar.stop()                                                                                       
-            self.progress_bar.set(0)                                                                                       
-            self.unlock_ui()                                                                                               
-        finally:                                                                                                           
-            self.downloading = False                                                                                       
+            self._total_bytes = ydl._total_bytes # Store total bytes after download completes
+                                                                                                                          
+            self.after(0, self.show_popup)                                                                                                     
+            self.after(0, self.unlock_ui) 
+                                                                                                                 
+        except Exception as e:                                                                                                                 
+            self.after(0, lambda: self.show_popup(                                                                                             
+                "Download Failed!",                                                                                                            
+                success=False,                                                                                                                 
+                error_detail=str(e)                                                                                                            
+            ))                                                                                                                                 
+            self.progress_bar.stop()                                                                                                           
+            self.progress_bar.set(0)                                                                                                                                                                                                                            
+        finally:                                                                                                                               
+                # Ensure UI is unlocked if it wasn't already                                                                                       
+                self.after(0, self.unlock_ui)                                                                                                      
+                self.downloading = False                                                                                                           
+                self.validate_inputs()                                                                                      
                                                                                                                            
     def validate_inputs(self, event=None):                                                                                 
         url = self.url_entry.get().strip()                                                                                 
@@ -365,28 +370,27 @@ class UniversalDownloader(ctk.CTk):
                     hover_color=self.ACTION_HOVER,                                                                                 
                     text_color_disabled=self.TEXT_DISABLED                                                                 
                 )                                                                                                          
-                                                                                                                           
-    def start_download_thread(self):                                                                                       
-        if self.downloading:                                                                                               
-            return                                                                                                         
-                                                                                                                           
-        # Update button to "Downloading..."                                                                                
-        self.download_btn.configure(text="Downloading...", state="disabled")                                               
-                                                                                                                           
-        self.downloading = True                                                                                            
-        self.lock_ui("Downloading...")                                                                                     
-                                                                                                                           
-        # Set progress bar mode based on whether total bytes are known                                                     
-        total_bytes = self.download_media.total_bytes if hasattr(self.download_media, 'total_bytes') else None             
-        if total_bytes:                                                                                                    
-            self.progress_bar.configure(mode="determinate")                                                                
-        else:                                                                                                              
-            self.progress_bar.configure(mode="indeterminate")                                                              
-            self.progress_bar.start()                                                                                      
-                                                                                                                           
-        # Create and start the download thread                                                                             
-        self.download_thread = threading.Thread(target=self.download_media, daemon=True)                                   
-        self.download_thread.start()                                                                                       
+                                                                                                                                                                                                                                                   
+    def start_download_thread(self):                                                                                                           
+        if self.downloading:                                                                                                                   
+            return                                                                                                                             
+        
+        # Lock the UI before starting the download                                                                                             
+        self.lock_ui("Downloading...")                                                                                                                                          
+        
+        # Update button text                                                                                                                   
+        self.download_btn.configure(text="Downloading...", state="disabled")                                                                   
+                                                                                                                                            
+        # Initialize progress bar                                                                                                              
+        self.progress_bar.set(0)  # Reset progress                                                                                             
+        self.progress_bar.configure(mode="determinate")                                                                                      
+        self.progress_bar.start()                                                                                                              
+                                                                                                                                            
+        # Create and start the download thread                                                                                                 
+        self.download_thread = threading.Thread(target=self.download_media, daemon=True)                                                       
+        self.download_thread.start()                                                                                                           
+                                                                                                                                            
+        # Remove the progress bar setup from here and handle it in the download_progress_hook instead                                                                                 
                                                                                                                            
     def lock_ui(self, button_text):                                                                                        
         self.url_entry.configure(state="disabled")                                                                         
@@ -441,105 +445,92 @@ class UniversalDownloader(ctk.CTk):
                                                                                                                            
         self.downloading = False                                                                                           
         self.validate_inputs()                                                                                             
-                                                                                                                              
-    
+                                                                                                                                                                                                                                                             
     def download_progress_hook(self, d):                                                                                                       
         try:                                                                                                                                   
-            total_bytes = d.get('total_bytes', 0) or d.get('total_bytes_estimate', 0)                                                          
-                                                                                                                                            
-            # Set up total bytes based on available data                                                                                       
-            total = total_bytes                                                                                                                
-            total_bytes_estimate = None                                                                                                        
-            if total_bytes > 0:                                                                                                                
-                total_bytes_estimate = total_bytes                                                                                             
-                total = d.get('total_bytes', 0)                                                                                                
-            elif total_bytes_estimate is not None:                                                                                             
+            # Get total bytes or estimate                                                                                                      
+            total = d.get('total_bytes', 0)                                                                                                    
+            if total == 0:                                                                                                                     
                 total = d.get('total_bytes_estimate', 0)                                                                                       
                                                                                                                                             
-            # Initialize progress bar based on known totals                                                                                    
-            if total > 0:                                                                                                                      
-                self.progress_bar.configure(mode="determinate")                                                                                
-                self.progress_bar.set(0)                                                                                                       
-                self.progress_bar.update()  # Start updating from 0%                                                                           
-            elif total_bytes_estimate is not None:                                                                                             
-                self.progress_bar.configure(mode="indeterminate")                                                                              
-                self.progress_bar.set(0)                                                                                                       
-                self.progress_bar.update()  # Start updating from 0%                                                                           
-            else:                                                                                                                              
-                self.progress_bar.configure(mode="indeterminate")                                                                              
-                self.progress_bar.set(0)                                                                                                       
-                self.progress_bar.update()  # Start updating from 0%                                                                           
+            # Store the total bytes when we first know them                                                                                    
+            if total > 0 and not hasattr(self, '_total_bytes'):                                                                                
+                self._total_bytes = total                                                                                                      
                                                                                                                                             
-            # Update progress based on download progress                                                                                       
-            downloaded = d.get('downloaded_bytes', 0)                                                                                          
-            progress_percent = (downloaded / total) * 100 if total > 0 else 0                                                                  
-            self.progress_bar.set(progress_percent)                                                                                            
+            # Calculate progress based on stored total                                                                                         
+            if hasattr(self, '_total_bytes') and self._total_bytes > 0:                                                                        
+                progress = (d.get('downloaded_bytes', 0) / self._total_bytes) * 100                                                            
+                self.progress_bar.set(progress)                                                                                                
+            else:                                                                                                                              
+                # If no total available, keep in indeterminate mode                                                                            
+                pass                                                                                                                           
                                                                                                                                             
         except Exception as e:                                                                                                                 
-            print(f"Progress hook error: {e}")                                                                                                                                                              
+            print(f"Progress hook error: {e}")                                                                                                 
+                                                                                                                                                                                                    
                                                                                                                            
-    def show_popup(self, title, success, error_detail=None):                                                               
-        # Set popup appearance mode to match main window                                                                   
-        ctk.set_appearance_mode("system")                                                                                  
-                                                                                                                           
-        # Create the popup window                                                                                          
-        popup = ctk.CTkToplevel(self)                                                                                      
-        popup.resizable(True, True)  # Allow resizing                                                                      
-        popup.title("")  # No title in title bar                                                                                                 
-                                                                                                                           
-        if sys.platform == "darwin":                                                                                       
-            popup.wm_attributes("-type", "dialog")                                                                         
-                                                                                                                           
-        popup.grab_set()  # Make the popup modal
-                                                                                                                           
-        width, height = 350, 140                                                                                           
-        center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)                                               
-        center_y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)                                             
-        popup.geometry(f"{width}x{height}+{center_x}+{center_y}")                                                          
-                                                                                                                           
-        if sys.platform == "win32":                                                                                        
-            try:                                                                                                           
-                from ctypes import windll, byref, sizeof, c_int                                                            
-                hwnd = windll.user32.GetParent(popup.winfo_id())                                                           
-                DWMWA_WINDOW_CORNER_PREFERENCE = 33                                                                        
-                DWMWCP_ROUND = c_int(2)                                                                                    
-                windll.dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,                                  
-                                                    byref(DWMWCP_ROUND), sizeof(DWMWCP_ROUND))                             
-            except Exception:                                                                                              
-                pass                                                                                                       
-                                                                                                                           
-        label = ctk.CTkLabel(                                                                                              
-            popup,                                                                                                         
-            text="Download Complete!" if success else "Download Failed!",                                                  
-            wraplength=300,                                                                                                
-            font=self.FONT_BOLD,                                                                                           
-            text_color=self.TEXT_MAIN                                                                                      
-        )                                                                                                                  
-        label.pack(expand=True, pady=(20, 10))                                                                             
-                                                                                                                           
-        if not success:                                                                                                    
-            error_label = ctk.CTkLabel(                                                                                    
-                popup,                                                                                                     
-                text=f"Error: {error_detail}",                                                                             
-                wraplength=300,                                                                                            
-                font=self.FONT_MAIN,                                                                                      
-                text_color=self.TEXT_MAIN                                                                              
-            )                                                                                                              
-            error_label.pack(pady=(10, 0))                                                                                 
-                                                                                                                           
-        btn = ctk.CTkButton(                                                                                               
-            popup,                                                                                                         
-            text="Close",                                                                                                  
-            font=self.FONT_BOLD,                                                                                           
-            width=120,                                                                                                     
-            height=36,                                                                                                     
-            corner_radius=25,                                                                                              
-            fg_color=self.ACTION_BTN,                                                                                      
-            hover_color=self.ACTION_HOVER,                                                                                 
-            text_color=self.ACTION_TEXT,                                                                                   
-            command=lambda: (popup.grab_release(), popup.destroy())                                                        
-        )                                                                                                                  
-        btn.pack(pady=(0, 20))                                                                                             
+    def show_popup(self, title, success, error_detail=None):                                                                   
+        # Set popup appearance mode to match main window                                                                       
+        ctk.set_appearance_mode("system")                                                                                      
+                                                                                                                            
+        # Create the popup window                                                                                              
+        popup = ctk.CTkToplevel(self)                                                                                          
+        popup.resizable(True, True)  # Allow resizing                                                                          
+        popup.title("")  # No title in title bar                                                                               
+                                                                                                                            
+        if sys.platform == "darwin":                                                                                           
+            popup.wm_attributes("-type", "dialog")                                                                             
+                                                                                                                            
+        popup.grab_set()  # Make the popup modal                                                                               
+                                                                                                                            
+        width, height = 350, 140                                                                                               
+        center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)                                                   
+        center_y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)                                                 
+        popup.geometry(f"{width}x{height}+{center_x}+{center_y}")                                                              
+                                                                                                                            
+        if sys.platform == "win32":                                                                                            
+            try:                                                                                                               
+                from ctypes import windll, byref, sizeof, c_int                                                                
+                hwnd = windll.user32.GetParent(popup.winfo_id())                                                               
+                DWMWA_WINDOW_CORNER_PREFERENCE = 33                                                                            
+                DWMWCP_ROUND = c_int(2)                                                                                        
+                windll.dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,                                      
+                                                    byref(DWMWCP_ROUND), sizeof(DWMWCP_ROUND))                                 
+            except Exception:                                                                                                  
+                pass                                                                                                           
+                                                                                                                            
+        label = ctk.CTkLabel(                                                                                                  
+            popup,                                                                                                             
+            text="Download Complete!" if success else "Download Failed!",                                                      
+            wraplength=300,                                                                                                    
+            font=self.FONT_BOLD,                                                                                               
+            text_color=self.TEXT_MAIN                                                                                          
+        )                                                                                                                      
+        label.pack(expand=True, pady=(20, 10))                                                                                 
+                                                                                                                            
+        if not success:                                                                                                        
+            error_label = ctk.CTkLabel(                                                                                        
+                popup,                                                                                                         
+                text=f"Error: {error_detail}",                                                                                 
+                wraplength=300,                                                                                                
+                font=self.FONT_MAIN,                                                                                           
+                text_color=self.TEXT_MAIN                                                                                      
+            )                                                                                                                  
+            error_label.pack(pady=(10, 0))                                                                                     
+                                                                                                                            
+        btn = ctk.CTkButton(                                                                                                   
+            popup,                                                                                                             
+            text="Close",                                                                                                      
+            font=self.FONT_BOLD,                                                                                               
+            width=120,                                                                                                         
+            height=36,                                                                                                         
+            corner_radius=25,                                                                                                  
+            fg_color=self.ACTION_BTN,                                                                                          
+            hover_color=self.ACTION_HOVER,                                                                                     
+            text_color=self.ACTION_TEXT,                                                                                       
+            command=lambda: (popup.grab_release(), popup.destroy())                                                            
+        )                                                                                                                      
+        btn.pack(pady=(0, 20))
                                                                                                                            
     def on_focus_in(self, widget):                                                                                         
         widget.configure(border_color=self.ENTRY_FOCUS)                                                                    
