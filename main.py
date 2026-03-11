@@ -130,9 +130,6 @@ class UniversalDownloader(ctk.CTk):
         # Tracks active download
         self.downloading = False
 
-        # Version number for easy updates
-        self.VERSION_NUMBER = "v0.2.0"
-
         # 1. Window Setup
         self.geometry("500x420")
 
