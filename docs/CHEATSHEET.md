@@ -3,28 +3,28 @@
 ## Core Modes
 Here are the primary modes for Aider Brain Cabinet:
 
-1. **Resident** - Resident RTX 5070 Ti. Private and fast.
+1. **RESIDENT** - Resident RTX 5070 Ti. Private and fast.
    - Uses deepcoder:14b (architect) and qwen3.5:9b (editor)
 
-2. **Hybrid** - Gemini 2.5 Pro (Architect) + Local Qwen (Editor). Best for complex features.
+2. **HYBRID** - Gemini 2.5 Pro (Architect) + Local Qwen (Editor). Best for complex features.
    - Combines Gemini's power with local editing efficiency
 
-3. **Surgeon** - Direct local editing. No architectural planning.
+3. **SURGEON** - Direct local editing. No architectural planning.
    - Uses qwen3.5:9b for focused editing tasks
 
-4. **Thinker** - Deep reasoning for hard bugs - Gemini Flash
+4. **THINKER** - Deep reasoning for hard bugs - Gemini Flash
    - Specialized for complex problem-solving and reasoning
 
-5. **Auditor** - Safe mode - Read the whole repo, no editing
+5. **AUDITOR** - Safe mode - Read the whole repo, no editing
    - Read-only mode for reviewing and analysis
 
-6. **Voice** - Dictate code changes using your Mac's mic
+6. **VOICE** - Dictate code changes using your Mac's mic
    - Voice-controlled code editing
 
-7. **BigBrain** - The Heavyweight - Gemini 3.1 Pro
+7. **BIGBRAIN** - The Heavyweight - Gemini 3.1 Pro
    - Best for: "Explain how this whole app works" or "Refactor the entire API layer"
 
-8. **Boss** - The Local Heavyweight - DeepSeekR1 Qwen 2.5 Coder 7B
+8. **BOSS** - The Local Heavyweight - DeepSeekR1 Qwen 2.5 Coder 7B
    - Best for: Truly difficult logic bugs where 14B models fail
 
 ## Workflow Commands
