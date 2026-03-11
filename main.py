@@ -329,11 +329,7 @@ class UniversalDownloader(ctk.CTk):
             self.after(0, self.unlock_ui)
 
         except Exception as e:
-            self.after(0, lambda: self.show_popup(
-                "Download Failed!",
-                success=False,
-                error_detail=str(e)
-            ))
+        #self.after(0, lambda: self.show_popup("Download Failed!", success=False, error_detail=str(e)))
             self.progress_bar.stop()
             self.progress_bar.set(0)
             self.unlock_ui()
@@ -429,10 +425,6 @@ class UniversalDownloader(ctk.CTk):
             fg_color=self.BTN_DISABLED
         )
 
-        self.progress_bar.configure(mode="determinate")
-        self.progress_bar.stop()
-        self.progress_bar.set(0)
-
         self.downloading = False
         self.validate_inputs()
 
@@ -453,8 +445,14 @@ class UniversalDownloader(ctk.CTk):
                     except KeyError:
                         pass
                 
-                self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
-            
+                try:
+                    speed = d.get('speed')
+                    time = d.get('time')
+                    if speed and time:
+                        self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
+                except KeyError:
+                    pass
+                
             elif d['status'] == 'postprocessing':
                 progress = d.get('progress', 0)
                 self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
@@ -465,7 +463,7 @@ class UniversalDownloader(ctk.CTk):
                 self.after(0, self.unlock_ui)
                 
         except Exception as e:
-            print(f"Progress hook error: {e}")  # Debug print
+            print(f"Progress hook error: {e}")
 
     def show_popup(self):
         # Set popup appearance mode to match main window
@@ -474,6 +472,7 @@ class UniversalDownloader(ctk.CTk):
         # Create the popup window
         popup = ctk.CTkToplevel(self)
         popup.resizable(True, True)  # Allow resizing
+        popup.title("")
         
         if sys.platform == "darwin":
             popup.wm_attributes("-type", "dialog")
