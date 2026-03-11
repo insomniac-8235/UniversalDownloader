@@ -20,6 +20,14 @@ def get_ffmpeg_path():
             raise FileNotFoundError("ffmpeg not found in PATH")
         return ffmpeg_path
 
+def get_resource_path(relative_path: str):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
+
 
 def set_app_icon(window):
     if sys.platform == "win32":
@@ -37,13 +45,6 @@ def set_app_icon(window):
                 pass
     # macOS: no runtime icon call needed
 
-def get_resource_path(relative_path: str):
-    try:
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-
-    return os.path.join(base_path, relative_path)
 
 # --- PYINSTALLER NOCONSOLE FIX ---
 # If the app is compiled without a console, route all print statements to a black hole
@@ -52,13 +53,11 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
-
 # Set Appearance
 ctk.set_appearance_mode("system")
 ctk.set_default_color_theme("blue")
 ctk.set_widget_scaling(1)  # Forces widgets to render at 100% internal scale
 ctk.set_window_scaling(1)  # Forces the window to render at 100% internal scale
-
 
 class MyLogger:
     def debug(self, msg):
@@ -67,7 +66,6 @@ class MyLogger:
             print(f"DEBUG: {msg}")
     def warning(self, msg): print(f"WARNING: {msg}")
     def error(self, msg): print(f"ERROR: {msg}")
-
 
 class UniversalDownloader(ctk.CTk):
     def __init__(self):
@@ -146,17 +144,13 @@ class UniversalDownloader(ctk.CTk):
             self.configure(background=self.APP_BG[1] if ctk.get_appearance_mode() == "Dark" else self.APP_BG[0])
             self.title("")  # Hides the text so it doesn't look cluttered
 
-
         # 2. Build the UI first! (This fills the 'empty' window)
         self.setup_ui()
 
         # 3. Call your icon logic
         set_app_icon(self)
 
-
-    # --- WINDOW MANAGEMENT HELPERS ---
-    
-    def set_appwindow(self):
+    def apply_windows_fixes(self):
         """The Master Boot Sequence for a titleless Windows 11 App"""
         if sys.platform != "win32": return
         try:
@@ -203,6 +197,48 @@ class UniversalDownloader(ctk.CTk):
 
             self.geometry(f"+{new_x}+{new_y}")
 
+    def set_appwindow(self):
+        """ This allows the titleless window to show up in the Taskbar and Alt+Tab. """
+        from ctypes import windll
+        # Windows Extended Style flags
+        GWL_EXSTYLE = -20
+        WS_EX_APPWINDOW = 0x00040000
+        WS_EX_TOOLWINDOW = 0x00000080
+
+        # 1. Find the window's handle (ID)
+        hwnd = windll.user32.GetParent(self.winfo_id())
+
+        # 2. Update the style to act like a 'top-level' app window
+        style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
+        windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+
+        # 3. Briefly hide and show to force Windows to update the taskbar icon
+        self.withdraw()
+        self.after(10, self.deiconify)
+        
+        self.enable_mica()
+        
+    def set_native_rounding(self):
+        """ Tells Windows 11 to apply native rounded corners. """
+        if sys.platform == "win32":
+            try:
+                from ctypes import windll, c_int, byref, sizeof
+
+                # Attribute 33 = Corner Preference in Win11
+                DWMWA_WINDOW_CORNER_PREFERENCE = 33
+                DWMWCP_ROUND = c_int(2)  # 2 = Standard Rounding
+
+                hwnd = windll.user32.GetParent(self.winfo_id())
+                windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_WINDOW_CORNER_PREFERENCE,
+                    byref(DWMWCP_ROUND),
+                    sizeof(DWMWCP_ROUND)
+                )
+            except Exception:
+                pass  # Silently fail on Windows 10
+
     def setup_ui(self):
         # 1. Main Background
         self.bg_frame = ctk.CTkFrame(self, fg_color=self.APP_BG, corner_radius=0)
@@ -232,7 +268,6 @@ class UniversalDownloader(ctk.CTk):
             self.exit_btn.place(relx=1.0, x=0, y=0, anchor="ne")
 
         # 4. CONTENT AREA ---
-
         self.content_frame = ctk.CTkFrame(self.bg_frame, fg_color="transparent")
         self.content_frame.pack(pady=(0, 20), padx=20, fill="both", expand=True)
         self.content_frame.grid_columnconfigure(0, weight=1)
@@ -299,7 +334,6 @@ class UniversalDownloader(ctk.CTk):
         self.folder_browse_btn.place(relx=1.0, rely=0.49, x=-10, y=0, anchor="e")
 
         # 3. OPTIONS (Audio Toggle)
-        # We style the label text to match the text theme
         self.audio_label = ctk.CTkLabel(self.content_frame, text="Audio Only", font=self.FONT_BOLD,
                                         text_color=self.TEXT_MAIN)
         self.audio_label.grid(row=4, column=0, sticky="w", pady=(0, 20))
@@ -307,11 +341,11 @@ class UniversalDownloader(ctk.CTk):
         self.audio_switch = ctk.CTkSwitch(
             self.content_frame,
             text="",
-            switch_width=40,  # Slightly sleeker width
-            switch_height=20,  # Slightly sleeker height
-            fg_color=self.ENTRY_BG,  # Track color when OFF
-            progress_color=self.ACTION_BTN,  # Track color when ON (bright blue)
-            button_color=self.ACTION_BTN,  # The thumb
+            switch_width=40,
+            switch_height=20,
+            fg_color=self.ENTRY_BG,
+            progress_color=self.ACTION_BTN,
+            button_color=self.ACTION_BTN,
             button_hover_color=self.ACTION_HOVER,
             border_width=2,
             border_color=self.ACTION_BTN,
@@ -355,7 +389,7 @@ class UniversalDownloader(ctk.CTk):
         self.version_label.place(relx=1.0, rely=1.0, x=-20, y=-5, anchor="se")
         self.version_label.configure(text=self.get_build_info())
 
-        # 6a. Powered By Label
+        # 6a. Powered By LABEL
         self.credit_label = ctk.CTkLabel(
             self.bg_frame,
             text="Powered by yt-dlp",
@@ -367,37 +401,45 @@ class UniversalDownloader(ctk.CTk):
 
     # --- LOGIC METHODS ---
     def minimize_window(self):
-        """ The only way to minimize a titleless window on Windows. """
-        self.overrideredirect(False)  # Temporarily give it a title bar so the OS allows minimizing
+        self.overrideredirect(False)
         self.state('iconic')
-        # We bind an event to detect when the user clicks the taskbar to bring it back
         self.bind("<Map>", self.restore_window)
 
     def restore_window(self, event=None):
-        """ Re-hides the title bar once the window is visible again. """
         if self.state() == 'normal':
             self.overrideredirect(True)
-            # Re-apply our Taskbar/Alt+Tab fixes so it stays in the list
             self.after(10, self.set_appwindow)
-            # Unbind so it doesn't fire constantly
             self.unbind("<Map>")
 
-    def download_media(self):                                                                                                                                                                                                                                                                                                                  
-        from yt_dlp import YoutubeDL  # moved here for faster startup                                                                                                                                                                                                                                                                          
-        url = self.url_entry.get().strip()                                                                                                                                                                                                                                                                                                     
-        folder = self.folder_entry.get().strip()                                                                                                                                                                                                                                                                                               
-        is_audio = self.audio_switch.get()                                                                                                                                                                                                                                                                                                     
-                                                                                                                                                                                                                                                                                                                                            
-        ffmpeg_path = get_ffmpeg_path()                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                            
-        # Ensure executables are executable on Linux/macOS                                                                                                                                                                                                                                                                                     
-        if sys.platform != "win32":                                                                                                                                                                                                                                                                                                            
-            if ffmpeg_path and os.path.exists(ffmpeg_path):                                                                                                                                                                                                                                                                                    
-                try:                                                                                                                                                                                                                                                                                                                           
-                    import stat                                                                                                                                                                                                                                                                                                                
-                    os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)                                                                                                                                                                                                                                                         
-                except Exception as e:                                                                                                                                                                                                                                                                                                         
-                    print(f"Permission setup failed: {e}") 
+    def setup_ffmpeg(self):
+        """Ensure ffmpeg is properly configured and executable."""
+        try:
+            # Get the ffmpeg path
+            ffmpeg_path = get_ffmpeg_path()
+            
+            # Ensure ffmpeg is executable on Linux/macOS
+            if sys.platform != "win32":
+                if ffmpeg_path and os.path.exists(ffmpeg_path):
+                    try:
+                        import stat
+                        os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)
+                    except Exception as e:
+                        print(f"Permission setup failed: {e}")
+            
+            return ffmpeg_path
+        except Exception as e:
+            print(f"FFmpeg setup failed: {e}")
+            raise
+
+    def download_media(self):
+        from yt_dlp import YoutubeDL
+        
+        # Setup ffmpeg before starting download
+        ffmpeg_path = self.setup_ffmpeg()
+        
+        url = self.url_entry.get().strip()
+        folder = self.folder_entry.get().strip()
+        is_audio = self.audio_switch.get()
 
         ydl_opts = {
             'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
@@ -422,11 +464,8 @@ class UniversalDownloader(ctk.CTk):
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
 
-            # Success
             self.after(0, lambda: self.show_popup("Download Complete!", folder=folder, success=True))
-
         except Exception as e:
-            # Failure
             self.after(0, lambda e=e: self.show_popup(
                 "Download Failed!",
                 folder=None,
@@ -434,21 +473,15 @@ class UniversalDownloader(ctk.CTk):
                 error_detail=str(e)
             ))
         finally:
-            # Stop progress bar & reset
             self.after(0, lambda: self.progress_bar.stop())
             self.after(0, lambda: self.progress_bar.set(0))
-
-            # Re-enable UI
             self.after(0, self.unlock_ui)
 
     def validate_inputs(self, event=None):
-        """Enable or disable the Download button based on URL and folder inputs."""
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
 
-        # If both fields are valid and folder exists
         if url and folder and os.path.isdir(folder):
-            # Only enable if not currently downloading
             if self.download_btn.cget("text") not in ("Downloading...", "Finalising File..."):
                 self.download_btn.configure(
                     state="normal",
@@ -458,7 +491,6 @@ class UniversalDownloader(ctk.CTk):
                     text_color=self.ACTION_TEXT
                 )
         else:
-            # Disable button if inputs are invalid or during download/finalising
             if self.download_btn.cget("text") not in ("Downloading...", "Finalising File..."):
                 self.download_btn.configure(
                     state="disabled",
@@ -468,33 +500,25 @@ class UniversalDownloader(ctk.CTk):
                     text_color_disabled=self.TEXT_DISABLED
                 )
 
-    # --- Download Thread Starter ---
     def start_download_thread(self):
         if self.downloading:
-            return  # already downloading
+            return
 
         self.downloading = True
         self.lock_ui("Downloading...")
 
-        # Initialize progress bar
         self.progress_bar.configure(mode="determinate", progress_color=self.PROG_FILL)
         self.progress_bar.set(0)
 
-        # Start the download in a background thread
         threading.Thread(target=self.download_media, daemon=True).start()
 
-    # --- Unified UI Lock/Unlock ---
     def lock_ui(self, button_text):
-        """Disable inputs & buttons and set Download button text."""
-        # Disable entries
         self.url_entry.configure(state="disabled")
         self.folder_entry.configure(state="disabled")
 
-        # Disable buttons
         for btn in (self.folder_browse_btn, self.paste_btn):
             btn.configure(state="disabled", fg_color=self.BTN_DISABLED, hover_color=self.BTN_DISABLED)
 
-        # Disable Audio switch
         self.audio_switch.configure(
             state="disabled",
             progress_color=self.BTN_DISABLED,
@@ -502,7 +526,6 @@ class UniversalDownloader(ctk.CTk):
             button_color=self.BTN_DISABLED
         )
 
-        # Disable Download button
         self.download_btn.configure(
             state="disabled",
             text=button_text,
@@ -512,7 +535,6 @@ class UniversalDownloader(ctk.CTk):
         )
 
     def unlock_ui(self):
-        """Re-enable inputs & fully reset UI state."""
         self.url_entry.configure(state="normal")
         self.folder_entry.configure(state="normal")
 
@@ -535,7 +557,6 @@ class UniversalDownloader(ctk.CTk):
             button_color=self.ACTION_BTN
         )
 
-        # IMPORTANT: Reset download button first
         self.download_btn.configure(
             text="Enter a URL & Location",
             state="disabled",
@@ -543,11 +564,8 @@ class UniversalDownloader(ctk.CTk):
         )
 
         self.downloading = False
-
-        # Now re-run validation to enable if inputs exist
         self.validate_inputs()
 
-    # --- Download Progress Hook ---
     def download_progress_hook(self, d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate')
@@ -556,33 +574,27 @@ class UniversalDownloader(ctk.CTk):
                 percent = downloaded / total
                 self.after(0, lambda p=percent: self.progress_bar.set(p))
             else:
-                # Indeterminate mode for unknown total
                 self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
                 self.after(0, self.progress_bar.start)
 
         elif d['status'] == 'finished':
-            # Show "Finalising File..." during merging/processing
             self.after(0, lambda: self.download_btn.configure(text="Finalising File..."))
             self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
             self.after(0, self.progress_bar.start)
 
-    # --- Unified Popup ---
     def show_popup(self, message, folder=None, success=True, error_detail=None):
-        """Displays a small locked popup with rounded corners and a Close button."""
         self.update_idletasks()
         popup = ctk.CTkToplevel(self, fg_color=self.APP_BG)
-        popup.overrideredirect(True)  # No title bar
+        popup.overrideredirect(True)
         popup.resizable(False, False)
 
         popup.grab_set()
 
-        # Size & center
         width, height = 350, 160 if error_detail else 140
         center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)
         center_y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)
         popup.geometry(f"{width}x{height}+{center_x}+{center_y}")
 
-        # Apply Windows 11 rounded corners if on Win11
         if sys.platform == "win32":
             try:
                 from ctypes import windll, byref, sizeof, c_int
@@ -594,7 +606,6 @@ class UniversalDownloader(ctk.CTk):
             except Exception:
                 pass
 
-        # --- Message ---
         full_message = str(message)
         if error_detail:
             full_message += "\n\n" + str(error_detail)[:150] + "..."
@@ -608,7 +619,6 @@ class UniversalDownloader(ctk.CTk):
         )
         label.pack(expand=True, pady=(20, 10))
 
-        # --- Close button ---
         btn_color = self.ACTION_BTN if success else self.BTN_DISABLED
         btn_hover = self.ACTION_HOVER if success else self.BTN_DISABLED
         btn_text_color = self.ACTION_TEXT if success else self.TEXT_DISABLED
@@ -628,21 +638,15 @@ class UniversalDownloader(ctk.CTk):
         btn.pack(pady=(0, 20))
 
     def on_focus_in(self, widget):
-        # 1. Glow the border
         widget.configure(border_color=self.ENTRY_FOCUS)
-        # 2. Make the text pure white/dark black (Active)
         widget.configure(text_color=("#000000", "#ffffff"))
 
     def on_focus_out(self, widget):
-        # 1. If empty, hide the border completely
         if not widget.get().strip():
             widget.configure(border_color=self.BORDER_HIDDEN)
-            # Use 'Ghost' grey for placeholder/empty state
             widget.configure(text_color=self.TEXT_GHOST)
         else:
-            # 2. If it has text, show the 'Idle' border
             widget.configure(border_color=self.BORDER_DEFAULT)
-            # Use 'Main' grey for filled-but-inactive state
             widget.configure(text_color=self.TEXT_MAIN)
 
     def select_folder(self):
@@ -688,17 +692,14 @@ class UniversalDownloader(ctk.CTk):
             print("Mica failed:", e)
 
     def get_build_info(self):
-        """Combines Version Number and Git Commit for the UI."""
-        version = "v0.2.1"  # Manually update this here for each release
+        version = "v0.2.1"
         try:
             path = get_resource_path("assets/commit.txt")
             with open(path, "r") as f:
                 commit = f.read().strip()
             return f"{version} ({commit})"
         except Exception:
-            # Fallback for local development
             return f"{version} (Dev)"
-
 
 if __name__ == "__main__":
     app = UniversalDownloader()
