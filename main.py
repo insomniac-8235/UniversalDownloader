@@ -398,17 +398,6 @@ class UniversalDownloader(ctk.CTk):
         self.credit_label.place(x=20, rely=1.0, y=-5, anchor="sw")
 
     # --- LOGIC METHODS ---
-    def minimize_window(self):
-        self.overrideredirect(False)
-        self.state('iconic')
-        self.bind("<Map>", self.restore_window)
-
-    def restore_window(self, event=None):
-        if self.state() == 'normal':
-            self.overrideredirect(True)
-            self.after(10, self.set_appwindow)
-            self.unbind("<Map>")
-
     def setup_ffmpeg(self):
         """Ensure ffmpeg is properly configured and executable."""
         try:
@@ -502,18 +491,11 @@ class UniversalDownloader(ctk.CTk):
         if self.downloading:
             return
 
-        # Update button to "Finalising..."
-        self.download_btn.configure(text="Finalising...", state="disabled")
-        
         self.downloading = True
-        self.lock_ui("Finalising...")
+        self.lock_ui("Downloading...")
         
         # Reset progress bar
         self.after(0, lambda: self.progress_bar.set(0))
-        
-        # Set progress bar to indeterminate mode
-        self.progress_bar.configure(mode="indeterminate")
-        self.progress_bar.start()
         
         # Create and start the download thread
         self.download_thread = threading.Thread(target=self.download_media, daemon=True)
@@ -528,9 +510,6 @@ class UniversalDownloader(ctk.CTk):
 
         self.audio_switch.configure(
             state="disabled",
-            progress_color=self.BTN_DISABLED,
-            fg_color=self.BTN_DISABLED,
-            button_color=self.BTN_DISABLED
         )
 
         self.download_btn.configure(
@@ -565,7 +544,7 @@ class UniversalDownloader(ctk.CTk):
         )
 
         self.download_btn.configure(
-            text="Download Now",
+            text="Enter a URL & Location",
             state="disabled",
             fg_color=self.BTN_DISABLED
         )
@@ -622,7 +601,7 @@ class UniversalDownloader(ctk.CTk):
         
         # Create the popup window
         popup = ctk.CTkToplevel(self)
-        popup.title("Download Progress" if success else "Error")  # Add a title for the window
+        # popup.title("Download Progress" if success else "Error")  # Add a title for the window
         popup.resizable(True, True)  # Allow resizing
         
         # For macOS, set the window type to get rounded corners
