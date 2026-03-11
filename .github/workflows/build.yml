@@ -150,8 +150,17 @@ jobs:
       - name: Rename macOS artifact with version
         id: rename
         run: |
-          mv "${{ env.APP_NAME }}_macOS_beta.dmg" "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
-          echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
+          # Remove "beta" from the filename if it exists
+          if [[ "${{ env.APP_NAME }}_macOS_beta.dmg" == *"beta"* ]]; then
+            base_name="${{ env.APP_NAME }}_macOS"
+          else
+            base_name="${{ env.APP_NAME }}_macOS_beta"
+          fi
+
+          # Append the version number to the base name
+          new_name="${base_name}_${{ env.VERSION }}.dmg"
+          mv "${{ env.APP_NAME }}_macOS_beta.dmg" "$new_name"
+          echo "artifact=$new_name" >> $GITHUB_OUTPUT
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
