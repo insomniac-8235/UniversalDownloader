@@ -123,3 +123,11 @@ jobs:
             "${{ env.APP_NAME }}_macOS_beta.dmg"
           
           echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Use a unique name so it doesn't clash with the Windows artifact
+          name: macos-bin
+          # Ensure this path matches the DMG filename created in the previous step
+          path: "*.dmg"
