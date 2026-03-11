@@ -129,110 +129,13 @@ class UniversalDownloader(ctk.CTk):
 
         # 1. Window Setup
         self.geometry("500x420")
-
-        if sys.platform == "win32":
-            self.overrideredirect(True)
-            self.after(100, self.apply_windows_fixes)
-        elif sys.platform == "darwin":
-            # This keeps the Traffic Lights but makes the background of the bar
-            # match your APP_BG. It's the "Modern Mac" look.
-            self.configure(background=self.APP_BG[1] if ctk.get_appearance_mode() == "Dark" else self.APP_BG[0])
-            self.title("")  # Hides the text so it doesn't look cluttered
+        self.title("Universal Media Downloader")
 
         # 2. Build the UI first! (This fills the 'empty' window)
         self.setup_ui()
 
         # 3. Call your icon logic
         set_app_icon(self)
-
-    def apply_windows_fixes(self):
-        """The Master Boot Sequence for a titleless Windows 11 App"""
-        if sys.platform != "win32": return
-        try:
-            from ctypes import windll, c_int, byref, sizeof
-            hwnd = windll.user32.GetParent(self.winfo_id())
-
-            # A. Taskbar & Alt+Tab Fix
-            GWL_EXSTYLE = -20
-            WS_EX_APPWINDOW = 0x00040000
-            WS_EX_TOOLWINDOW = 0x00000080
-            style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-            windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-
-            # B. Native Windows 11 Rounding
-            DWMWA_WINDOW_CORNER_PREFERENCE = 33
-            DWMWCP_ROUND = c_int(2)
-            windll.dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, byref(DWMWCP_ROUND), sizeof(DWMWCP_ROUND))
-
-            # C. Mica Effect (Windows 11 22H2+)
-            DWMWA_SYSTEMBACKDROP_TYPE = 38
-            DWMSBT_MAINWINDOW = 2 # Mica effect
-            windll.dwmapi.DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, byref(c_int(DWMSBT_MAINWINDOW)), sizeof(c_int(DWMSBT_MAINWINDOW)))
-
-            # D. Force Update
-            self.withdraw()
-            self.deiconify()
-        except Exception as e:
-            print(f"Windows Polish Failed: {e}")
-
-    # --- DRAGGING LOGIC ---
-    def start_move(self, event):
-        # Because this is bound to title_bar, 'event.x/y' are
-        # relative to the BAR, not the window.
-        self._drag_data = {"x": event.x, "y": event.y}
-
-    def do_move(self, event):
-        if self._drag_data:
-            deltax = event.x - self._drag_data["x"]
-            deltay = event.y - self._drag_data["y"]
-
-            new_x = self.winfo_x() + deltax
-            new_y = self.winfo_y() + deltay
-
-            self.geometry(f"+{new_x}+{new_y}")
-
-    def set_appwindow(self):
-        """ This allows the titleless window to show up in the Taskbar and Alt+Tab. """
-        from ctypes import windll
-        # Windows Extended Style flags
-        GWL_EXSTYLE = -20
-        WS_EX_APPWINDOW = 0x00040000
-        WS_EX_TOOLWINDOW = 0x00000080
-
-        # 1. Find the window's handle (ID)
-        hwnd = windll.user32.GetParent(self.winfo_id())
-
-        # 2. Update the style to act like a 'top-level' app window
-        style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-        windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-
-        # 3. Briefly hide and show to force Windows to update the taskbar icon
-        self.withdraw()
-        self.after(10, self.deiconify)
-        
-        self.enable_mica()
-        
-    def set_native_rounding(self):
-        """ Tells Windows 11 to apply native rounded corners. """
-        if sys.platform == "win32":
-            try:
-                from ctypes import windll, c_int, byref, sizeof
-
-                # Attribute 33 = Corner Preference in Win11
-                DWMWA_WINDOW_CORNER_PREFERENCE = 33
-                DWMWCP_ROUND = c_int(2)  # 2 = Standard Rounding
-
-                hwnd = windll.user32.GetParent(self.winfo_id())
-                windll.dwmapi.DwmSetWindowAttribute(
-                    hwnd,
-                    DWMWA_WINDOW_CORNER_PREFERENCE,
-                    byref(DWMWCP_ROUND),
-                    sizeof(DWMWCP_ROUND)
-                )
-            except Exception:
-                pass  # Silently fail on Windows 10
 
     def setup_ui(self):
         # 1. Main Background
@@ -352,7 +255,7 @@ class UniversalDownloader(ctk.CTk):
             self.content_frame,
             height=16,
             fg_color=self.ENTRY_BG,
-            progress_color=self.ENTRY_BG,
+            progress_color=self.PROG_FILL,
             corner_radius=8,
             mode="determinate"
         )
@@ -416,50 +319,49 @@ class UniversalDownloader(ctk.CTk):
             raise
 
     def download_media(self):
-        from yt_dlp import YoutubeDL
-        
-        # Setup ffmpeg before starting download
-        ffmpeg_path = self.setup_ffmpeg()
-        
-        url = self.url_entry.get().strip()
-        folder = self.folder_entry.get().strip()
-        is_audio = self.audio_switch.get()
-
-        ydl_opts = {
-            'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
-            'restrictfilenames': True,
-            'noplaylist': True,
-            'ffmpeg_location': ffmpeg_path,
-            'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
-            'logger': MyLogger(),
-            'progress_hooks': [self.download_progress_hook],
-        }
-
-        if is_audio:
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192'
-            }]
-        else:
-            ydl_opts['merge_output_format'] = 'mp4'
-
         try:
+            ffmpeg_path = self.setup_ffmpeg()
+            
+            url = self.url_entry.get().strip()
+            folder = self.folder_entry.get().strip()
+            is_audio = self.audio_switch.get()
+
+            ydl_opts = {
+                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+                'restrictfilenames': True,
+                'noplaylist': True,
+                'ffmpeg_location': ffmpeg_path,
+                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
+                'logger': MyLogger(),
+                'progress_hooks': [self.download_progress_hook],
+            }
+
+            if is_audio:
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192'
+                }]
+            else:
+                ydl_opts['merge_output_format'] = 'mp4'
+
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
 
-            self.after(0, lambda: self.show_popup("Download Complete!", folder=folder, success=True))
+            self.after(0, self.show_popup)
+            self.after(0, self.unlock_ui)
+
         except Exception as e:
-            self.after(0, lambda e=e: self.show_popup(
+            self.after(0, lambda: self.show_popup(
                 "Download Failed!",
-                folder=None,
                 success=False,
                 error_detail=str(e)
             ))
-        finally:
-            self.after(0, lambda: self.progress_bar.stop())
-            self.after(0, lambda: self.progress_bar.set(0))
-            self.after(0, self.unlock_ui)
+            self.progress_bar.stop()
+            self.progress_bar.set(0)
+            self.unlock_ui()
+    finally:
+        self.downloading = False
 
     def validate_inputs(self, event=None):
         url = self.url_entry.get().strip()
@@ -488,11 +390,15 @@ class UniversalDownloader(ctk.CTk):
         if self.downloading:
             return
 
-        self.downloading = True
-        self.lock_ui("Downloading...")
+        # Update button to "Finalising..."
+        self.download_btn.configure(text="Finalising...", state="disabled")
         
-        # Reset progress bar
-        self.after(0, lambda: self.progress_bar.set(0))
+        self.downloading = True
+        self.lock_ui("Finalising...")
+        
+        # Set progress bar to indeterminate mode and start
+        self.progress_bar.configure(mode="indeterminate")
+        self.progress_bar.start()
         
         # Create and start the download thread
         self.download_thread = threading.Thread(target=self.download_media, daemon=True)
@@ -552,7 +458,6 @@ class UniversalDownloader(ctk.CTk):
     def download_progress_hook(self, d):
         try:
             if d['status'] == 'downloading':
-                # Calculate progress percentage
                 total = d.get('total_bytes') or d.get('total_bytes_estimate')
                 downloaded = d.get('downloaded_bytes', 0)
                 
@@ -560,7 +465,6 @@ class UniversalDownloader(ctk.CTk):
                     percent = downloaded / total
                     self.after(0, lambda: self.progress_bar.set(percent))
                 else:
-                    # Fallback to time-based estimation if total bytes are unavailable
                     try:
                         time_left = d['time']
                         progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
@@ -568,46 +472,40 @@ class UniversalDownloader(ctk.CTk):
                     except KeyError:
                         pass
                 
-                # Update speed and time if available
                 try:
                     speed = d.get('speed')
                     time = d.get('time')
                     if speed and time:
-                        # Update progress bar based on time estimate if available
                         self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
                 except KeyError:
                     pass
                 
             elif d['status'] == 'postprocessing':
-                # Handle postprocessing progress
                 progress = d.get('progress', 0)
                 self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
                 
             elif d['status'] == 'finished':
-                # Stop the progress bar and reset when download completes
                 self.after(0, lambda: self.progress_bar.stop())
                 self.after(0, lambda: self.progress_bar.set(1.0))
                 self.after(0, self.unlock_ui)
                 
         except Exception as e:
-            print(f"Progress hook error: {e}")  # Debug print
+            print(f"Progress hook error: {e}")
 
-    def show_popup(self, message, folder=None, success=True, error_detail=None):
+    def show_popup(self):
         # Set popup appearance mode to match main window
         ctk.set_appearance_mode("system")
         
         # Create the popup window
         popup = ctk.CTkToplevel(self)
-        # popup.title("Download Progress" if success else "Error")  # Add a title for the window
         popup.resizable(True, True)  # Allow resizing
         
-        # For macOS, set the window type to get rounded corners
         if sys.platform == "darwin":
             popup.wm_attributes("-type", "dialog")
         
         popup.grab_set()
         
-        width, height = 350, 160 if error_detail else 140
+        width, height = 350, 140
         center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)
         center_y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)
         popup.geometry(f"{width}x{height}+{center_x}+{center_y}")
@@ -623,22 +521,14 @@ class UniversalDownloader(ctk.CTk):
             except Exception:
                 pass
 
-        full_message = str(message)
-        if error_detail:
-            full_message += "\n\n" + str(error_detail)[:150] + "..."
-
         label = ctk.CTkLabel(
             popup,
-            text=full_message,
+            text="Download Complete!",
             wraplength=300,
             font=self.FONT_BOLD,
             text_color=self.TEXT_MAIN
         )
         label.pack(expand=True, pady=(20, 10))
-
-        btn_color = self.ACTION_BTN if success else self.BTN_DISABLED
-        btn_hover = self.ACTION_HOVER if success else self.BTN_DISABLED
-        btn_text_color = self.ACTION_TEXT if success else self.TEXT_DISABLED
 
         btn = ctk.CTkButton(
             popup,
@@ -647,9 +537,9 @@ class UniversalDownloader(ctk.CTk):
             width=120,
             height=36,
             corner_radius=25,
-            fg_color=btn_color,
-            hover_color=btn_hover,
-            text_color=btn_text_color,
+            fg_color=self.ACTION_BTN,
+            hover_color=self.ACTION_HOVER,
+            text_color=self.ACTION_TEXT,
             command=lambda: (popup.grab_release(), popup.destroy())
         )
         btn.pack(pady=(0, 20))
@@ -683,30 +573,6 @@ class UniversalDownloader(ctk.CTk):
             self.url_entry.delete(0, "end")
             self.url_entry.insert(0, text)
             self.validate_inputs()
-
-    def enable_mica(self):
-        if sys.platform != "win32":
-            return
-
-        try:
-            from ctypes import windll, byref, sizeof, c_int
-
-            hwnd = windll.user32.GetParent(self.winfo_id())
-
-            DWMWA_SYSTEMBACKDROP_TYPE = 38
-            DWMSBT_MAINWINDOW = 2
-
-            value = c_int(DWMSBT_MAINWINDOW)
-
-            windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_SYSTEMBACKDROP_TYPE,
-                byref(value),
-                sizeof(value)
-            )
-
-        except Exception as e:
-            print("Mica failed:", e)
 
     def get_build_info(self):
         version = "v0.2.1"
