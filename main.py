@@ -52,13 +52,6 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
-# --- PYINSTALLER NOCONSOLE FIX ---
-# If the app is compiled without a console, route all print statements to a black hole
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, 'w')
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, 'w')
-
 
 # Set Appearance
 ctk.set_appearance_mode("system")
