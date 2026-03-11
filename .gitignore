@@ -18,3 +18,4 @@ build/
 # Ignore Python Cache
 __pycache__/
 *.pyc
+.aider*
