@@ -28,6 +28,24 @@ def get_resource_path(relative_path: str):
 
     return os.path.join(base_path, relative_path)
 
+
+def set_app_icon(window):
+    if sys.platform == "win32":
+        # Windows already embedded via --icon, runtime call optional
+        icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.ico")
+        if os.path.exists(icon_path):
+            window.iconbitmap(icon_path)
+    elif sys.platform.startswith("linux"):
+        icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.png")
+        if os.path.exists(icon_path):
+            try:
+                from tkinter import PhotoImage
+                window.iconphoto(True, PhotoImage(file=icon_path))
+            except Exception:
+                pass
+    # macOS: no runtime icon call needed
+
+
 # --- PYINSTALLER NOCONSOLE FIX ---
 # If the app is compiled without a console, route all print statements to a black hole
 if sys.stdout is None:
