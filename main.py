@@ -237,7 +237,7 @@ class UniversalDownloader(ctk.CTk):
             fg_color=self.ENTRY_BG,                                                                                        
             progress_color=self.PROG_FILL,                                                                                 
             corner_radius=8,                                                                                               
-            mode="indeterminate"                                                                                           
+            mode="determinate"                                                                                           
         )                                                                                                                  
         self.progress_bar.set(0)                                                                                           
         self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 20))                                   
@@ -441,52 +441,42 @@ class UniversalDownloader(ctk.CTk):
                                                                                                                            
         self.downloading = False                                                                                           
         self.validate_inputs()                                                                                             
-                                                                                                                           
-    def download_progress_hook(self, d):                                                                                   
-        if d['status'] == 'downloading':                                                                                   
-            # Check if total bytes are known                                                                               
-            total = d.get('total_bytes') or d.get('total_bytes_estimate')                                                  
-            downloaded = d.get('downloaded_bytes', 0)                                                                      
-                                                                                                                           
-            if total:                                                                                                      
-                # Use determinate mode if total bytes are known                                                            
-                progress_percent = min(int((float(downloaded) / total) * 100), 100)
-                if total > 10**12:
-                    totalGB = total / (10**12)
-                    downloadedGB = downloaded / (10**12)
-                    progress = f"Download {progress_percent}% of {totalGB:.2f}GB"
-                elif total > 10**9:
-                    totalGB = total / (10**9)
-                    downloadedGB = downloaded / (10**9)
-                    progress = f"Download {progress_percent}% of {totalGB:.2f}GB"
-                elif total > 10**6:
-                    totalMB = total / (10**6)
-                    downloadedMB = downloaded / (10**6)
-                    progress = f"Download {progress_percent}% of {totalMB:.2f}MB"
-                elif total > 10**3:
-                    totalKB = total / (10**3)
-                    downloadedKB = downloaded / (10**3)
-                    progress = f"Download {progress_percent}% of {totalKB:.2f}KB"
-                else:
-                    progress = f"Download {progress_percent}% of {total}B"
-            else:                                                                                                          
-                # Switch to indeterminate mode if total bytes are unknown                                                  
-                self.progress_bar.configure(mode="indeterminate")                                                          
-                self.progress_bar.start()                                                                                  
-                                                                                                                           
-            # Update progress bar                                                                                           
-            self.progress_bar.set(progress_percent)                                                                         
-                                                                                                                           
-        elif d['status'] == 'postprocessing':                                                                              
-            # Handle postprocessing progress                                                                               
-            progress = d.get('progress', 0)                                                                                
-            self.progress_bar.set(progress / 100)                                                                          
-                                                                                                                           
-        elif d['status'] == 'finished':                                                                                    
-            # Stop the progress bar and reset when download completes                                                      
-            self.progress_bar.stop()                                                                                       
-            self.progress_bar.set(1.0)                                                                                     
-            self.after(0, self.unlock_ui)                                                                                  
+                                                                                                                              
+    
+    def download_progress_hook(self, d):                                                                                                       
+        try:                                                                                                                                   
+            total_bytes = d.get('total_bytes', 0) or d.get('total_bytes_estimate', 0)                                                          
+                                                                                                                                            
+            # Set up total bytes based on available data                                                                                       
+            total = total_bytes                                                                                                                
+            total_bytes_estimate = None                                                                                                        
+            if total_bytes > 0:                                                                                                                
+                total_bytes_estimate = total_bytes                                                                                             
+                total = d.get('total_bytes', 0)                                                                                                
+            elif total_bytes_estimate is not None:                                                                                             
+                total = d.get('total_bytes_estimate', 0)                                                                                       
+                                                                                                                                            
+            # Initialize progress bar based on known totals                                                                                    
+            if total > 0:                                                                                                                      
+                self.progress_bar.configure(mode="determinate")                                                                                
+                self.progress_bar.set(0)                                                                                                       
+                self.progress_bar.update()  # Start updating from 0%                                                                           
+            elif total_bytes_estimate is not None:                                                                                             
+                self.progress_bar.configure(mode="indeterminate")                                                                              
+                self.progress_bar.set(0)                                                                                                       
+                self.progress_bar.update()  # Start updating from 0%                                                                           
+            else:                                                                                                                              
+                self.progress_bar.configure(mode="indeterminate")                                                                              
+                self.progress_bar.set(0)                                                                                                       
+                self.progress_bar.update()  # Start updating from 0%                                                                           
+                                                                                                                                            
+            # Update progress based on download progress                                                                                       
+            downloaded = d.get('downloaded_bytes', 0)                                                                                          
+            progress_percent = (downloaded / total) * 100 if total > 0 else 0                                                                  
+            self.progress_bar.set(progress_percent)                                                                                            
+                                                                                                                                            
+        except Exception as e:                                                                                                                 
+            print(f"Progress hook error: {e}")                                                                                                                                                              
                                                                                                                            
     def show_popup(self, title, success, error_detail=None):                                                               
         # Set popup appearance mode to match main window                                                                   
@@ -495,12 +485,12 @@ class UniversalDownloader(ctk.CTk):
         # Create the popup window                                                                                          
         popup = ctk.CTkToplevel(self)                                                                                      
         popup.resizable(True, True)  # Allow resizing                                                                      
-        popup.title(title)                                                                                                 
+        popup.title("")  # No title in title bar                                                                                                 
                                                                                                                            
         if sys.platform == "darwin":                                                                                       
             popup.wm_attributes("-type", "dialog")                                                                         
                                                                                                                            
-        popup.grab_set()                                                                                                   
+        popup.grab_set()  # Make the popup modal
                                                                                                                            
         width, height = 350, 140                                                                                           
         center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)                                               
@@ -532,8 +522,8 @@ class UniversalDownloader(ctk.CTk):
                 popup,                                                                                                     
                 text=f"Error: {error_detail}",                                                                             
                 wraplength=300,                                                                                            
-                font=self.FONT_SMALL,                                                                                      
-                text_color=self.TEXT_VERSION                                                                               
+                font=self.FONT_MAIN,                                                                                      
+                text_color=self.TEXT_MAIN                                                                              
             )                                                                                                              
             error_label.pack(pady=(10, 0))                                                                                 
                                                                                                                            
