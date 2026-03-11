@@ -45,5 +45,5 @@ VS_VERSION = VSVersionInfo(
             StringStruct(u'ProductVersion', VERSION_RAW),
         ])
     ],
-    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+    varfileinfo=VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
 )
