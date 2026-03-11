@@ -502,11 +502,18 @@ class UniversalDownloader(ctk.CTk):
         if self.downloading:
             return
 
+        # Update button to "Finalising..."
+        self.download_btn.configure(text="Finalising...", state="disabled")
+        
         self.downloading = True
-        self.lock_ui("Downloading...")
+        self.lock_ui("Finalising...")
         
         # Reset progress bar
         self.after(0, lambda: self.progress_bar.set(0))
+        
+        # Set progress bar to indeterminate mode
+        self.progress_bar.configure(mode="indeterminate")
+        self.progress_bar.start()
         
         # Create and start the download thread
         self.download_thread = threading.Thread(target=self.download_media, daemon=True)
@@ -558,7 +565,7 @@ class UniversalDownloader(ctk.CTk):
         )
 
         self.download_btn.configure(
-            text="Enter a URL & Location",
+            text="Download Now",
             state="disabled",
             fg_color=self.BTN_DISABLED
         )
