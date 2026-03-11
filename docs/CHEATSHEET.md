@@ -3,7 +3,7 @@
 ## Core Modes
 Here are the primary modes for Aider Brain Cabinet:
 
-1. **Local** - 100% Local RTX 5070 Ti. Private and fast.
+1. **Resident** - Resident RTX 5070 Ti. Private and fast.
    - Uses deepcoder:14b (architect) and qwen3.5:9b (editor)
 
 2. **Hybrid** - Gemini 2.5 Pro (Architect) + Local Qwen (Editor). Best for complex features.
@@ -40,10 +40,10 @@ Here are the primary modes for Aider Brain Cabinet:
 - `/tokens`: Check usage of your 16GB limit
 
 ## Productivity & Debugging Tips
-- Hide long reasoning with `/think-tokens 0`
-- See project files with `/map`
-- Revert changes with `/undo`
-- Use `{` on blank line for multi-line prompts
+- **/think-tokens 0**: Hide long reasoning blocks
+- **/map**: See project files
+- **/undo**: Revert changes
+- **{**: Start multi-line prompt (paste long errors)
 - **Up Arrow**: Cycle previous commands
 - **Ctrl-C**: Emergency stop
-- `/clear`: Clear chat history
+- **/clear**: Clear chat history
