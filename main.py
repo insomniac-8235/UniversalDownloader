@@ -131,6 +131,9 @@ class UniversalDownloader(ctk.CTk):
         # 1. Window Setup
         self.geometry("500x420")
         self.title("Universal Media Downloader")
+        
+        # Lock window size
+        self.resizable(False, False)
 
         # 2. Build the UI first! (This fills the 'empty' window)
         self.setup_ui()
@@ -374,15 +377,14 @@ class UniversalDownloader(ctk.CTk):
         self.downloading = True
         self.lock_ui("Downloading...")
         
-        # Set progress bar to indeterminate mode and start
-        self.progress_bar.configure(mode="indeterminate")
-        self.progress_bar.start()
-        
-        # Initialize download tracking variables
-        self.download_start_time = time.time()
-        self.total_downloaded_bytes = 0
-        self.last_speed_update = 0
-
+        # Set progress bar mode based on whether total bytes are known
+        total_bytes = self.download_media.total_bytes if hasattr(self.download_media, 'total_bytes') else None
+        if total_bytes:
+            self.progress_bar.configure(mode="determinate")
+        else:
+            self.progress_bar.configure(mode="indeterminate")
+            self.progress_bar.start()
+    
         # Create and start the download thread
         self.download_thread = threading.Thread(target=self.download_media, daemon=True)
         self.download_thread.start()
@@ -444,35 +446,52 @@ class UniversalDownloader(ctk.CTk):
     def download_progress_hook(self, d):
         try:
             if d['status'] == 'downloading':
-                # Update progress bar
+                # Check if total bytes are known
                 total = d.get('total_bytes') or d.get('total_bytes_estimate')
                 downloaded = d.get('downloaded_bytes', 0)
                 
                 if total:
+                    # Use determinate mode if total bytes are known
                     percent = downloaded / total
-                    self.after(0, lambda: self.progress_bar.set(percent))
-                    
-                # Calculate and display current speed
-                current_speed = d.get('speed', 0)
-                if current_speed:
-                    current_speed_mbps = current_speed / (1024 * 1024)  # Convert to Mbps
-                    self.after(0, lambda: self.speed_label.configure(
-                        text=f"Speed: {current_speed_mbps:.2f} Mbps"
-                    ))
-
-                # Update total downloaded bytes
-                self.total_downloaded_bytes += d.get('downloaded_bytes', 0)
-
-                # Calculate and display average speed every 5 seconds
-                if time.time() - self.last_speed_update >= 5:
-                    elapsed_time = time.time() - self.download_start_time
-                    if elapsed_time > 0:
-                        average_speed = (self.total_downloaded_bytes / elapsed_time) / (1024 * 1024)  # Convert to Mbps
-                        self.after(0, lambda: self.speed_label.configure(
-                            text=f"Speed: {current_speed_mbps:.2f} Mbps | Avg: {average_speed:.2f} Mbps"
-                        ))
-                    self.last_speed_update = time.time()
-
+                    self.progress_bar.set(percent)
+                else:
+                    # Switch to indeterminate mode if total bytes are unknown
+                    self.progress_bar.configure(mode="indeterminate")
+                    self.progress_bar.start()
+                
+                # Remove this block as we're using mode="indeterminate" when unknown
+                # if total:
+                #     percent = downloaded / total
+                #     self.progress_bar.set(percent)
+                # else:
+                #     try:
+                #         time_left = d['time']
+                #         progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
+                #         self.progress_bar.set(progress)
+                #     except KeyError:
+                #         pass
+                
+                # Update speed and time if available
+                try:
+                    speed = d.get('speed')
+                    time = d.get('time')
+                    if speed and time:
+                        # Update progress bar based on time estimate if available
+                        self.progress_bar.set(float(d['progress']))
+                except KeyError:
+                    pass
+            
+            elif d['status'] == 'postprocessing':
+                # Handle postprocessing progress
+                progress = d.get('progress', 0)
+                self.progress_bar.set(progress / 100)
+            
+            elif d['status'] == 'finished':
+                # Stop the progress bar and reset when download completes
+                self.progress_bar.stop()
+                self.progress_bar.set(1.0)
+                self.after(0, self.unlock_ui)
+            
         except Exception as e:
             print(f"Progress hook error: {e}")
 
