@@ -33,14 +33,23 @@ def get_next_states(state):
             moves.append((move, new_state_tuple))
     return moves
 
-def is_solvable(puzzle):
-    flat = [tile for row in puzzle for tile in row if tile != 0]
+def is_solvable(puzzle: list) -> bool:
+    # Calculate inversion count
     inv_count = 0
-    for i in range(len(flat)):
-        for j in range(i + 1, len(flat)):
-            if flat[i] > flat[j]:
+    for i in range(9):
+        for j in range(i + 1, 9):
+            if puzzle[i] != 0 and puzzle[j] != 0 and puzzle[i] > puzzle[j]:
                 inv_count += 1
-    return inv_count % 2 == 0
+
+    # Find blank tile position
+    blank_row = 0
+    for i, row in enumerate(puzzle):
+        if 0 in row:
+            blank_row = i
+            break
+
+    # Apply solvability condition
+    return (inv_count + blank_row) % 2 == 0
 
 def a_star(start):
     goal = ((1, 2, 3), (4, 5, 6), (7, 8, 0))
