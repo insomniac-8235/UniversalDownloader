@@ -14,12 +14,13 @@ VERSION_CLEAN = VERSION_RAW.lstrip('v')
 
 # Windows numeric version must be 4 integers: MAJOR, MINOR, PATCH, BUILD
 # Letters are not allowed, so we strip non-digits and treat pre-releases as build=0
-match = re.match(r'^(\d+)\.(\d+)\.(\d+)', VERSION_CLEAN)
+match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?:-(.+))?', VERSION_CLEAN)
 if match:
-    major, minor, patch = map(int, match.groups())
+    major, minor, patch, build, prerelease = match.groups()
+    major, minor, patch = map(int, [major, minor, patch])
+    build = int(build) if build else 0
 else:
-    major = minor = patch = 0
-build = 0
+    major = minor = patch = build = 0
 
 VS_VERSION = VSVersionInfo(
     ffi=FixedFileInfo(
@@ -36,12 +37,12 @@ VS_VERSION = VSVersionInfo(
         StringFileInfo([
             StringStruct(u'CompanyName', u'David Opasik'),
             StringStruct(u'FileDescription', u'Universal Downloader'),
-            StringStruct(u'FileVersion', VERSION_CLEAN),
+            StringStruct(u'FileVersion', VERSION_RAW),
             StringStruct(u'InternalName', u'UniversalDownloader'),
             StringStruct(u'LegalCopyright', u'© 2026 David Opasik. All Rights Reserved.'),
             StringStruct(u'OriginalFilename', u'UniversalDownloader.exe'),
             StringStruct(u'ProductName', u'Universal Downloader'),
-            StringStruct(u'ProductVersion', VERSION_CLEAN),
+            StringStruct(u'ProductVersion', VERSION_RAW),
         ])
     ],
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
