@@ -507,7 +507,10 @@ class UniversalDownloader(ctk.CTk):
 
         self.downloading = True
         self.lock_ui("Downloading...")
-
+        
+        # Reset progress bar
+        self.after(0, lambda: self.progress_bar.set(0))
+        
         # Create and start the download thread
         self.download_thread = threading.Thread(target=self.download_media, daemon=True)
         self.download_thread.start()
@@ -568,28 +571,45 @@ class UniversalDownloader(ctk.CTk):
 
     def download_progress_hook(self, d):
         if d['status'] == 'downloading':
+            # Calculate progress percentage
             total = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded = d.get('downloaded_bytes', 0)
             if total:
                 percent = downloaded / total
-                self.after(0, lambda p=percent: self.progress_bar.set(p))
+                self.after(0, lambda: self.progress_bar.set(percent))
             else:
-                self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
-                self.after(0, self.progress_bar.start)
-
+                # Fallback to time-based estimation if total bytes are unavailable
+                try:
+                    time_left = d['time']
+                    progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
+                    self.after(0, lambda: self.progress_bar.set(progress))
+                except KeyError:
+                    pass
+            # Update speed and time if available
+            try:
+                speed = d.get('speed')
+                time = d.get('time')
+                if speed and time:
+                    # You can update the label with these values if needed
+                    self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
+            except KeyError:
+                pass
+        elif d['status'] == 'postprocessing':
+            # Handle postprocessing progress
+            progress = d.get('progress', 0)
+            self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
         elif d['status'] == 'finished':
-            self.after(0, lambda: self.download_btn.configure(text="Finalising File..."))
-            self.after(0, lambda: self.progress_bar.configure(mode="indeterminate"))
-            self.after(0, self.progress_bar.start)
+            self.after(0, lambda: self.progress_bar.set(1.0))
+            self.after(0, self.unlock_ui)
 
     def show_popup(self, message, folder=None, success=True, error_detail=None):
         # Set popup appearance mode to match main window
         ctk.set_appearance_mode("system")
         
-        # Create the popup window with rounded corners on macOS
-        popup = ctk.CTkToplevel(self, fg_color=self.APP_BG)
-        popup.overrideredirect(True)
-        popup.resizable(False, False)
+        # Create the popup window
+        popup = ctk.CTkToplevel(self)
+        popup.title("Download Progress" if success else "Error")  # Add a title for the window
+        popup.resizable(True, True)  # Allow resizing
         
         # For macOS, set the window type to get rounded corners
         if sys.platform == "darwin":
