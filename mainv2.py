@@ -411,21 +411,35 @@ class UniversalDownloader(ctk.CTk):
             self.after(10, self.set_appwindow)
             self.unbind("<Map>")
 
+    def setup_ffmpeg(self):
+        """Ensure ffmpeg is properly configured and executable."""
+        try:
+            # Get the ffmpeg path
+            ffmpeg_path = get_ffmpeg_path()
+            
+            # Ensure ffmpeg is executable on Linux/macOS
+            if sys.platform != "win32":
+                if ffmpeg_path and os.path.exists(ffmpeg_path):
+                    try:
+                        import stat
+                        os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)
+                    except Exception as e:
+                        print(f"Permission setup failed: {e}")
+            
+            return ffmpeg_path
+        except Exception as e:
+            print(f"FFmpeg setup failed: {e}")
+            raise
+
     def download_media(self):
         from yt_dlp import YoutubeDL
+        
+        # Setup ffmpeg before starting download
+        ffmpeg_path = self.setup_ffmpeg()
+        
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
-
-        ffmpeg_path = get_ffmpeg_path()
-
-        if sys.platform != "win32":
-            if ffmpeg_path and os.path.exists(ffmpeg_path):
-                try:
-                    import stat
-                    os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)
-                except Exception as e:
-                    print(f"Permission setup failed: {e}")
 
         ydl_opts = {
             'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
