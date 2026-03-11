@@ -1,23 +1,18 @@
-<<<<<<< HEAD
-# This file is now empty and can be deleted or left as is.
-=======
 import os
-import shutil
 import sys
+import shutil
 
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
-        # Running as a bundled app
-        app_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-        ffmpeg_path = os.path.join(app_path, 'ffmpeg')
+        # The application is frozen (i.e., running as a bundled app)
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg')
         if not os.path.exists(ffmpeg_path):
-            # Copy FFmpeg from system to the app directory
-            system_ffmpeg_path = shutil.which('ffmpeg')
-            if system_ffmpeg_path:
-                shutil.copy(system_ffmpeg_path, ffmpeg_path)
-                os.chmod(ffmpeg_path, 0o755)
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')  # For Windows
         return ffmpeg_path
     else:
-        # Running as a script
-        return shutil.which('ffmpeg')
->>>>>>> parent of db53ac1 (feat: Add FFmpeg detection and bundling in PyInstaller environment)
+        # The application is not frozen (i.e., running in development mode)
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path is None:
+            raise FileNotFoundError("ffmpeg not found in PATH")
+        return ffmpeg_path
