@@ -154,7 +154,9 @@ class UniversalDownloader(ctk.CTk):
         set_app_icon(self)
 
 
-    def apply_windows_fixes(self):
+    # --- WINDOW MANAGEMENT HELPERS ---
+    
+    def set_appwindow(self):
         """The Master Boot Sequence for a titleless Windows 11 App"""
         if sys.platform != "win32": return
         try:
