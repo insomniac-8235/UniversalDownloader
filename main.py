@@ -444,45 +444,41 @@ class UniversalDownloader(ctk.CTk):
         self.validate_inputs()
 
     def download_progress_hook(self, d):
-        try:
-            if d['status'] == 'downloading':
-                # Check if total bytes are known
-                total = d.get('total_bytes') or d.get('total_bytes_estimate')
-                downloaded = d.get('downloaded_bytes', 0)
-                
-                if total:
-                    # Use determinate mode if total bytes are known
-                    percent = downloaded / total
-                    self.progress_bar.set(percent)
-                else:
-                    # Switch to indeterminate mode if total bytes are unknown
-                    self.progress_bar.configure(mode="indeterminate")
-                    self.progress_bar.start()
-                
-                # Update speed and time if available
-                try:
-                    speed = d.get('speed')
-                    time = d.get('time')
-                    if speed and time:
-                        # Update progress bar based on time estimate if available
-                        self.progress_bar.set(float(d['progress']))
-                except KeyError:
-                    pass
+        if d['status'] == 'downloading':
+            # Check if total bytes are known
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            downloaded = d.get('downloaded_bytes', 0)
             
-            elif d['status'] == 'postprocessing':
-                # Handle postprocessing progress
-                progress = d.get('progress', 0)
-                self.progress_bar.set(progress / 100)
+            if total:
+                # Use determinate mode if total bytes are known
+                percent = downloaded / total
+                self.progress_bar.set(f"Download {percent:.1f}%")
+            else:
+                # Switch to indeterminate mode if total bytes are unknown
+                self.progress_bar.configure(mode="indeterminate")
+                self.progress_bar.start()
             
-            elif d['status'] == 'finished':
-                # Stop the progress bar and reset when download completes
-                self.progress_bar.stop()
-                self.progress_bar.set(1.0)
-                self.after(0, self.unlock_ui)
-            
-        except Exception as e:
-            print(f"Progress hook error: {e}")
-
+            # Update speed and time if available
+            try:
+                speed = d.get('speed')
+                time = d.get('time')
+                if speed and time:
+                    # Update progress bar based on time estimate if available
+                    self.progress_bar.set(float(d['progress']))
+            except KeyError:
+                pass
+        
+        elif d['status'] == 'postprocessing':
+            # Handle postprocessing progress
+            progress = d.get('progress', 0)
+            self.progress_bar.set(progress / 100)
+        
+        elif d['status'] == 'finished':
+            # Stop the progress bar and reset when download completes
+            self.progress_bar.stop()
+            self.progress_bar.set(1.0)
+            self.after(0, self.unlock_ui)
+        
     def show_popup(self):
         # Set popup appearance mode to match main window
         ctk.set_appearance_mode("system")
