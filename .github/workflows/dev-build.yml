@@ -4,7 +4,7 @@ on:
   push:
     branches: ["main"]
     tags-ignore:
-      - "v*" # Prevents this from running when you do a real release
+      - "v*" # Trigger on branch push, but IGNORE if it's a version tag
 
 env:
   APP_NAME: UniversalDownloader
@@ -106,21 +106,20 @@ jobs:
             main.py
 
       - name: Create DMG with Applications Shortcut
-        id: rename
+        id: create_dmg_beta
         run: |
-          # 1. Create a temporary staging directory
           mkdir -p dist/dmg_staging
           
-          # 2. Copy the .app into the staging folder
-          cp -R "dist/UniversalDownloader_macOS.app" dist/dmg_staging/
+          # Use a wildcard (*.app) to find the folder regardless of the name
+          cp -R dist/*.app dist/dmg_staging/
           
-          # 3. Create the symbolic link to /Applications
+          # Create the shortcut
           ln -s /Applications dist/dmg_staging/Applications
           
-          # 4. Create the DMG from the staging folder
-          hdiutil create -volname "${{ env.APP_NAME }}" \
-                         -srcfolder dist/dmg_staging \
-                         -ov -format UDZO \
-                         "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
+          # Create the DMG
+          hdiutil create -volname "${{ env.APP_NAME }} Beta" \
+            -srcfolder dist/dmg_staging \
+            -ov -format UDZO \
+            "${{ env.APP_NAME }}_macOS_beta.dmg"
           
-          echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
+          echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT

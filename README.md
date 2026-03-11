@@ -2,7 +2,8 @@
 ![GitHub top language](https://img.shields.io/github/languages/top/insomniac-8235/UniversalDownloader)
 ![GitHub last commit](https://img.shields.io/github/last-commit/insomniac-8235/UniversalDownloader)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/insomniac-8235/UniversalDownloader/build.yml)
-
+![Release Build](https://github.com/insomniac-8235/UniversalDownloader/actions/workflows/build.yml/badge.svg)
+![Dev Build](https://github.com/insomniac-8235/UniversalDownloader/actions/workflows/dev-build.yml/badge.svg)
 # Universal Media Downloader
 A powerful, easy-to-use GUI for downloading media from various platforms. A standalone, high-performance media archiving utility for Windows and macOS. Built as an educational project exploring Python GUI development, asynchronous threading, and integrating external binaries (`yt-dlp`, FFmpeg) into a single compiled executable.
 
@@ -35,15 +36,11 @@ All releases include a `versions.txt` file containing the release tag and commit
 
 ### Windows Download Progress
 ![Windows Download Progress](docs/screenshots/windows_progress.png)  
-*Shows real-time progress and speed*
+*Shows real-time progress*
 
 ### macOS Main Window
 ![macOS Main Window](docs/screenshots/macos_main.png)  
 *The macOS interface, visually similar to Windows.*
-
-### macOS Download Progress
-![macOS Download Progress](docs/screenshots/macos_progress.png)  
-*Shows download progress on macOS with status and speed.*
 
 
 ---
@@ -63,8 +60,7 @@ All releases include a `versions.txt` file containing the release tag and commit
 ---
 
 ## Technical Features & Learning Outcomes
-* **Binary Bundling:** Packed FFmpeg and Deno into headless PyInstaller executables for both platforms.  
-* **Anti-Bot Bypass:** JavaScript runtime (Deno) handles modern web-scraping defenses.  
+* **Binary Bundling:** Packed FFmpeg into headless PyInstaller executables for both platforms.
 * **Thread-Safe UI:** CustomTkinter interface with logger updates safely passed from background threads.  
 * **Maximum Quality:** Auto-selects best video/audio streams and merges them natively.  
 * **Cross-Platform Consistency:** Windows and macOS versions behave identically with proper versioning.
@@ -79,9 +75,4 @@ All releases include a `versions.txt` file containing the release tag and commit
 ---
 
 ## Contributing
-Contributions are welcome! Fork the repository, make changes, and submit a pull request.  
-
----
-
-## License
-© 2026 David Opasik. All Rights Reserved.
+Contributions are welcome! Fork the repository, make changes, and submit a pull request.

@@ -2,9 +2,8 @@ name: Build & Release (Windows and macOS)
 
 on:
   push:
-    branches: ["main"]
     tags:
-      - "v*"  # Matches v0.1.0, v0.1.0-beta, etc.
+      - "v*"  # ONLY trigger on tags, never on a regular branch push
 
 env:
   APP_NAME: UniversalDownloader
@@ -129,11 +128,24 @@ jobs:
           --name "UniversalDownloader_macOS" \
           main.py
 
-      - name: Create DMG
-        id: rename
+      - name: Create DMG with Applications Shortcut
+        id: create_dmg_beta
         run: |
-          hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder dist/UniversalDownloader_macOS.app -ov -format UDZO "${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg"
-          echo "artifact=${{ env.APP_NAME }}_macOS_${{ env.VERSION }}.dmg" >> $GITHUB_OUTPUT
+          mkdir -p dist/dmg_staging
+
+          # Use a wildcard (*.app) to find the folder regardless of the name
+          cp -R dist/*.app dist/dmg_staging/
+
+          # Create the shortcut
+          ln -s /Applications dist/dmg_staging/Applications
+
+          # Create the DMG
+          hdiutil create -volname "${{ env.APP_NAME }} Beta" \
+            -srcfolder dist/dmg_staging \
+            -ov -format UDZO \
+            "${{ env.APP_NAME }}_macOS_beta.dmg"
+
+          echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
