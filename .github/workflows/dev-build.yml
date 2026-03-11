@@ -21,7 +21,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -71,7 +71,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -110,13 +110,10 @@ jobs:
         run: |
           mkdir -p dist/dmg_staging
           
-          # Use a wildcard (*.app) to find the folder regardless of the name
           cp -R dist/*.app dist/dmg_staging/
           
-          # Create the shortcut
           ln -s /Applications dist/dmg_staging/Applications
           
-          # Create the DMG
           hdiutil create -volname "${{ env.APP_NAME }} Beta" \
             -srcfolder dist/dmg_staging \
             -ov -format UDZO \
