@@ -26,10 +26,7 @@ def get_resource_path(relative_path: str):
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.dirname(os.path.abspath(__file__))
-
-    return os.path.join(base_path, relative_path)
-
-
+        
 def set_app_icon(window):
     if sys.platform == "win32":
         # Windows already embedded via --icon, runtime call optional
