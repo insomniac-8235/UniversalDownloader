@@ -2,8 +2,11 @@ import os
 import shutil
 import sys
 
+def is_frozen():
+    return getattr(sys, 'frozen', False)
+
 def get_ffmpeg_path():
-    if getattr(sys, 'frozen', False):
+    if is_frozen():
         # Running as a bundled app
         app_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
         ffmpeg_path = os.path.join(app_path, 'ffmpeg')
