@@ -5,6 +5,7 @@ import os
 import sys
 import shutil
 from yt_dlp import YoutubeDL
+import time
 
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
@@ -239,7 +240,16 @@ class UniversalDownloader(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 20))
 
-        # 5. MAIN ACTION BUTTON
+        # 5. ADD SPEED LABEL
+        self.speed_label = ctk.CTkLabel(
+            self.content_frame,
+            text="Speed: 0.0 Mbps",
+            font=self.FONT_SMALL,
+            text_color=self.TEXT_MAIN
+        )
+        self.speed_label.grid(row=6, column=0, columnspan=2, sticky="we", pady=(0, 20))
+
+        # 6. MAIN ACTION BUTTON
         self.download_btn = ctk.CTkButton(
             self.content_frame,
             text="Enter a URL & Location",
@@ -252,9 +262,9 @@ class UniversalDownloader(ctk.CTk):
             text_color_disabled=self.TEXT_DISABLED
         )
         self.download_btn.configure(command=self.start_download_thread)
-        self.download_btn.grid(row=6, column=0, sticky="s")
+        self.download_btn.grid(row=7, column=0, sticky="s")
 
-        # 6. VERSION LABEL
+        # 7. VERSION LABEL
         self.version_label = ctk.CTkLabel(
             self.bg_frame,
             font=self.FONT_SMALL,
@@ -264,7 +274,7 @@ class UniversalDownloader(ctk.CTk):
         self.version_label.place(relx=1.0, rely=1.0, x=-20, y=-5, anchor="se")
         self.version_label.configure(text=self.get_build_info())
 
-        # 6a. Powered By LABEL
+        # 7a. Powered By LABEL
         self.credit_label = ctk.CTkLabel(
             self.bg_frame,
             text="Powered by yt-dlp",
@@ -329,7 +339,11 @@ class UniversalDownloader(ctk.CTk):
             self.after(0, self.unlock_ui)
 
         except Exception as e:
-        #self.after(0, lambda: self.show_popup("Download Failed!", success=False, error_detail=str(e)))
+            self.after(0, lambda: self.show_popup(
+                "Download Failed!",
+                success=False,
+                error_detail=str(e)
+            ))
             self.progress_bar.stop()
             self.progress_bar.set(0)
             self.unlock_ui()
@@ -373,6 +387,11 @@ class UniversalDownloader(ctk.CTk):
         self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.start()
         
+        # Initialize download tracking variables
+        self.download_start_time = time.time()
+        self.total_downloaded_bytes = 0
+        self.last_speed_update = 0
+
         # Create and start the download thread
         self.download_thread = threading.Thread(target=self.download_media, daemon=True)
         self.download_thread.start()
@@ -425,43 +444,45 @@ class UniversalDownloader(ctk.CTk):
             fg_color=self.BTN_DISABLED
         )
 
+        self.progress_bar.stop()
+        self.progress_bar.set(0)
+        self.speed_label.configure(text="Speed: 0.0 Mbps")
+
         self.downloading = False
         self.validate_inputs()
 
     def download_progress_hook(self, d):
         try:
             if d['status'] == 'downloading':
+                # Update progress bar
                 total = d.get('total_bytes') or d.get('total_bytes_estimate')
                 downloaded = d.get('downloaded_bytes', 0)
                 
                 if total:
                     percent = downloaded / total
                     self.after(0, lambda: self.progress_bar.set(percent))
-                else:
-                    try:
-                        time_left = d['time']
-                        progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
-                        self.after(0, lambda: self.progress_bar.set(progress))
-                    except KeyError:
-                        pass
-                
-                try:
-                    speed = d.get('speed')
-                    time = d.get('time')
-                    if speed and time:
-                        self.after(0, lambda: self.progress_bar.set(float(d['progress'])))
-                except KeyError:
-                    pass
-                
-            elif d['status'] == 'postprocessing':
-                progress = d.get('progress', 0)
-                self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
-                
-            elif d['status'] == 'finished':
-                self.after(0, lambda: self.progress_bar.stop())
-                self.after(0, lambda: self.progress_bar.set(1.0))
-                self.after(0, self.unlock_ui)
-                
+                    
+                # Calculate and display current speed
+                current_speed = d.get('speed', 0)
+                if current_speed:
+                    current_speed_mbps = current_speed / (1024 * 1024)  # Convert to Mbps
+                    self.after(0, lambda: self.speed_label.configure(
+                        text=f"Speed: {current_speed_mbps:.2f} Mbps"
+                    ))
+
+                # Update total downloaded bytes
+                self.total_downloaded_bytes += d.get('downloaded_bytes', 0)
+
+                # Calculate and display average speed every 5 seconds
+                if time.time() - self.last_speed_update >= 5:
+                    elapsed_time = time.time() - self.download_start_time
+                    if elapsed_time > 0:
+                        average_speed = (self.total_downloaded_bytes / elapsed_time) / (1024 * 1024)  # Convert to Mbps
+                        self.after(0, lambda: self.speed_label.configure(
+                            text=f"Speed: {current_speed_mbps:.2f} Mbps | Avg: {average_speed:.2f} Mbps"
+                        ))
+                    self.last_speed_update = time.time()
+
         except Exception as e:
             print(f"Progress hook error: {e}")
 
