@@ -3,6 +3,8 @@ from tkinter import filedialog
 import threading
 import os
 import sys
+from ffmpeg_handler import get_ffmpeg_path
+
 
 def set_app_icon(window):
     if sys.platform == "win32":
@@ -414,24 +416,22 @@ class UniversalDownloader(ctk.CTk):
             # Unbind so it doesn't fire constantly
             self.unbind("<Map>")
 
-    def download_media(self):
-        from yt_dlp import YoutubeDL  # moved here for faster startup
-        url = self.url_entry.get().strip()
-        folder = self.folder_entry.get().strip()
-        is_audio = self.audio_switch.get()
-
-        ffmpeg_path = get_resource_path("ffmpeg.exe")
-        ffprobe_path = get_resource_path("ffprobe.exe")
-
-        # Ensure executables are executable on Linux/macOS
-        if sys.platform != "win32":
-            for exe_path in (ffmpeg_path, ffprobe_path):
-                if os.path.exists(exe_path):
-                    try:
-                        import stat
-                        os.chmod(exe_path, os.stat(exe_path).st_mode | stat.S_IEXEC)
-                    except Exception as e:
-                        print(f"Permission setup failed: {e}")
+    def download_media(self):                                                                                                                                                                                                                                                                                                                  
+        from yt_dlp import YoutubeDL  # moved here for faster startup                                                                                                                                                                                                                                                                          
+        url = self.url_entry.get().strip()                                                                                                                                                                                                                                                                                                     
+        folder = self.folder_entry.get().strip()                                                                                                                                                                                                                                                                                               
+        is_audio = self.audio_switch.get()                                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                                                            
+        ffmpeg_path = get_ffmpeg_path()                                                                                                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                                                                                                            
+        # Ensure executables are executable on Linux/macOS                                                                                                                                                                                                                                                                                     
+        if sys.platform != "win32":                                                                                                                                                                                                                                                                                                            
+            if ffmpeg_path and os.path.exists(ffmpeg_path):                                                                                                                                                                                                                                                                                    
+                try:                                                                                                                                                                                                                                                                                                                           
+                    import stat                                                                                                                                                                                                                                                                                                                
+                    os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)                                                                                                                                                                                                                                                         
+                except Exception as e:                                                                                                                                                                                                                                                                                                         
+                    print(f"Permission setup failed: {e}") 
 
         ydl_opts = {
             'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
