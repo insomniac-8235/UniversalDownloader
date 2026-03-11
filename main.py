@@ -4,6 +4,7 @@ import threading
 import os
 import sys
 import shutil
+from yt_dlp import YoutubeDL
 
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
@@ -507,10 +508,9 @@ class UniversalDownloader(ctk.CTk):
         self.downloading = True
         self.lock_ui("Downloading...")
 
-        self.progress_bar.configure(mode="determinate", progress_color=self.PROG_FILL)
-        self.progress_bar.set(0)
-
-        threading.Thread(target=self.download_media, daemon=True).start()
+        # Create and start the download thread
+        self.download_thread = threading.Thread(target=self.download_media, daemon=True)
+        self.download_thread.start()
 
     def lock_ui(self, button_text):
         self.url_entry.configure(state="disabled")
