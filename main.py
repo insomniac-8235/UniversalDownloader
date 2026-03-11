@@ -203,51 +203,6 @@ class UniversalDownloader(ctk.CTk):
 
             self.geometry(f"+{new_x}+{new_y}")
 
-            # --- WINDOW MANAGEMENT HELPERS ---
-    
-    def set_appwindow(self):
-        """ This allows the titleless window to show up in the Taskbar and Alt+Tab. """
-        from ctypes import windll
-        # Windows Extended Style flags
-        GWL_EXSTYLE = -20
-        WS_EX_APPWINDOW = 0x00040000
-        WS_EX_TOOLWINDOW = 0x00000080
-
-        # 1. Find the window's handle (ID)
-        hwnd = windll.user32.GetParent(self.winfo_id())
-
-        # 2. Update the style to act like a 'top-level' app window
-        style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-        windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-
-        # 3. Briefly hide and show to force Windows to update the taskbar icon
-        self.withdraw()
-        self.after(10, self.deiconify)
-        
-        self.enable_mica()
-        
-    def set_native_rounding(self):
-        """ Tells Windows 11 to apply native rounded corners. """
-        if sys.platform == "win32":
-            try:
-                from ctypes import windll, c_int, byref, sizeof
-
-                # Attribute 33 = Corner Preference in Win11
-                DWMWA_WINDOW_CORNER_PREFERENCE = 33
-                DWMWCP_ROUND = c_int(2)  # 2 = Standard Rounding
-
-                hwnd = windll.user32.GetParent(self.winfo_id())
-                windll.dwmapi.DwmSetWindowAttribute(
-                    hwnd,
-                    DWMWA_WINDOW_CORNER_PREFERENCE,
-                    byref(DWMWCP_ROUND),
-                    sizeof(DWMWCP_ROUND)
-                )
-            except Exception:
-                pass  # Silently fail on Windows 10
-    
-
     def setup_ui(self):
         # 1. Main Background
         self.bg_frame = ctk.CTkFrame(self, fg_color=self.APP_BG, corner_radius=0)
@@ -391,19 +346,18 @@ class UniversalDownloader(ctk.CTk):
         self.download_btn.grid(row=6, column=0, columnspan=2, sticky="s")
 
         # 6. VERSION LABEL
-
         self.version_label = ctk.CTkLabel(
-            self.bg_frame,  # <--- Changed from self to self.bg_frame
+            self.bg_frame,
             font=self.FONT_SMALL,
             text_color=self.TEXT_VERSION,
-            bg_color="transparent"  # Forces it to blend seamlessly
+            bg_color="transparent"
         )
         self.version_label.place(relx=1.0, rely=1.0, x=-20, y=-5, anchor="se")
         self.version_label.configure(text=self.get_build_info())
 
         # 6a. Powered By Label
         self.credit_label = ctk.CTkLabel(
-            self.bg_frame,  # <--- Changed from self to self.bg_frame
+            self.bg_frame,
             text="Powered by yt-dlp",
             font=self.FONT_SMALL,
             text_color=self.TEXT_VERSION,
