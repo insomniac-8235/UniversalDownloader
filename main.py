@@ -583,13 +583,20 @@ class UniversalDownloader(ctk.CTk):
             self.after(0, self.progress_bar.start)
 
     def show_popup(self, message, folder=None, success=True, error_detail=None):
-        self.update_idletasks()
+        # Set popup appearance mode to match main window
+        ctk.set_appearance_mode("system")
+        
+        # Create the popup window with rounded corners on macOS
         popup = ctk.CTkToplevel(self, fg_color=self.APP_BG)
         popup.overrideredirect(True)
         popup.resizable(False, False)
-
+        
+        # For macOS, set the window type to get rounded corners
+        if sys.platform == "darwin":
+            popup.wm_attributes("-type", "dialog")
+        
         popup.grab_set()
-
+        
         width, height = 350, 160 if error_detail else 140
         center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)
         center_y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)
