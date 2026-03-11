@@ -459,18 +459,6 @@ class UniversalDownloader(ctk.CTk):
                     self.progress_bar.configure(mode="indeterminate")
                     self.progress_bar.start()
                 
-                # Remove this block as we're using mode="indeterminate" when unknown
-                # if total:
-                #     percent = downloaded / total
-                #     self.progress_bar.set(percent)
-                # else:
-                #     try:
-                #         time_left = d['time']
-                #         progress = (d['downloaded_bytes'] / d['speed']) / (time_left + (d['downloaded_bytes'] / d['speed']))
-                #         self.progress_bar.set(progress)
-                #     except KeyError:
-                #         pass
-                
                 # Update speed and time if available
                 try:
                     speed = d.get('speed')
