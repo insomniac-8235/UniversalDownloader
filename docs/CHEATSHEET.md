@@ -1,4 +1,4 @@
-# Hey! Welcome to Aider Brain Cabinet (2026)
+# Hey there! Welcome to Aider Brain Cabinet (2026)
 
 ## Core Modes
 Here are the primary modes for Aider Brain Cabinet:
