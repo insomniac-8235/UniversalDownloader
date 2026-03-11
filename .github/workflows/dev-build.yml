@@ -128,6 +128,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # Use a unique name so it doesn't clash with the Windows artifact
-          name: macos-bin
+          name: macos-dev-build
           # Ensure this path matches the DMG filename created in the previous step
           path: "*.dmg"
