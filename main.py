@@ -3,7 +3,22 @@ from tkinter import filedialog
 import threading
 import os
 import sys
-from ffmpeg_handler import get_ffmpeg_path
+import shutil
+
+def get_ffmpeg_path():
+    if getattr(sys, 'frozen', False):
+        # The application is frozen (i.e., running as a bundled app)
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg')
+        if not os.path.exists(ffmpeg_path):
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')  # For Windows
+        return ffmpeg_path
+    else:
+        # The application is not frozen (i.e., running in development mode)
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path is None:
+            raise FileNotFoundError("ffmpeg not found in PATH")
+        return ffmpeg_path
 
 
 def set_app_icon(window):
@@ -37,11 +52,13 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
-# make sure ffmpeg binary used when frozen
-if getattr(sys, "frozen", False):
-    ffmpeg_path = os.path.join(sys._MEIPASS, "ffmpeg")
-else:
-    ffmpeg_path = "ffmpeg"
+# --- PYINSTALLER NOCONSOLE FIX ---
+# If the app is compiled without a console, route all print statements to a black hole
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+
 
 # Set Appearance
 ctk.set_appearance_mode("system")
