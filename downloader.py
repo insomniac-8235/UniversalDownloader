@@ -8,6 +8,12 @@ from utilities import MyLogger, get_deno_path
 
 
 def get_ffmpeg_path():
+    # 1️⃣  Look in a bundled `ffmpeg_bin/` folder (relative to this file)
+    for name in ("ffmpeg", "ffmpeg.exe"):
+        p = os.path.join(os.path.dirname(__file__), "ffmpeg_bin", name)
+        if os.path.isfile(p):
+            return p
+
     if getattr(sys, 'frozen', False):
         base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
         ffmpeg_path = os.path.join(base_path, 'ffmpeg')
