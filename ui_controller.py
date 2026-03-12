@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import filedialog
 import os
 import sys
+import threading
 from typing import Callable
 from downloader import DownloadManager
 from utilities import MyLogger
@@ -284,20 +285,18 @@ class UIController:
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
-        
+
         if url and folder and os.path.isdir(folder):
             self.lock_ui("Downloading...")
-            # Set the progress hook before starting the download
             self.download_manager.set_progress_hook(self.download_progress_hook)
-            try:
-                success = self.download_manager.download_media(
-                    url, folder, is_audio
-                )
-                if success:
-                    self.download_complete(True)
-            except Exception as e:
-                self.logger.error(f"Download failed: {str(e)}")
-                self.download_complete(False, str(e))
+
+            # Run the download in a background thread so the UI stays responsive
+            t = threading.Thread(
+                target=self._download_thread,
+                args=(url, folder, is_audio),
+                daemon=True
+            )
+            t.start()
         else:
             if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
                 self.download_btn.configure(
@@ -309,9 +308,23 @@ class UIController:
                 )
     
     def download_progress_hook(self, progress):
-        """Update the progress bar with the current download progress"""
-        self.after(0, lambda p=progress: self.progress_bar.set(p))
+        """
+        Convert the 0‑100 percentage from DownloadManager into the 0‑1
+        range that CTkProgressBar expects.
+        """
+        # Ensure we only update the progress bar on the main thread
+        self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
         
+    # New helper method to run the download in a background thread
+    def _download_thread(self, url: str, folder: str, is_audio: bool):
+        try:
+            success = self.download_manager.download_media(url, folder, is_audio)
+            # Schedule the completion callback on the main thread
+            self.root.after(0, self.download_complete, success, None)
+        except Exception as exc:
+            self.logger.error(f"Download failed: {exc}")
+            self.root.after(0, self.download_complete, False, str(exc))
+
     def download_complete(self, success, error_detail=None):
         """Handle download completion or failure"""
         self.unlock_ui()
