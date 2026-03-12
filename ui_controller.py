@@ -11,9 +11,15 @@ class UIController:
         self.root = root
         self.download_manager = download_manager
         self.logger = logger
+        
+        # Global Theme Settings (These are module-level, not instance-level)
+        ctk.set_appearance_mode("system")
+        ctk.set_default_color_theme("blue")
+        
+        # Instance Settings
         self.setup_ui()
         self.bind_events()
-        
+
     def setup_ui(self):
         # Initialize theme colors
         self.theme = {
@@ -42,7 +48,7 @@ class UIController:
             self.input_font = ctk.CTkFont(family="Consolas", size=14)
             
         # Create main frames
-        self.bg_frame = ctk.CTkFrame(self.root, fg_color=self.theme["APP_BG"][0], corner_radius=0)
+        self.bg_frame = ctk.CTkFrame(self.root, corner_radius=0)
         self.bg_frame.pack(fill="both", expand=True)
         
         self.content_frame = ctk.CTkFrame(self.bg_frame, fg_color="transparent")
@@ -178,7 +184,7 @@ class UIController:
             height=50,
             width=300,
             corner_radius=25,
-            font=ctk.CTkFont(family=self.main_font.family(), size=18, weight="bold"),
+            font=self.main_font,
             state="disabled",
             fg_color=self.theme["BTN_DISABLED"][0],
             text_color_disabled=self.theme["TEXT_DISABLED"][0]
@@ -189,7 +195,7 @@ class UIController:
         self.version_label = ctk.CTkLabel(
             self.bg_frame,
             text=f"v0.2.1",
-            font=ctk.CTkFont(family=self.main_font.family(), size=10),
+            font=self.main_font,
             text_color=self.theme["TEXT_VERSION"][0],
             bg_color="transparent"
         )
@@ -198,7 +204,7 @@ class UIController:
         self.credit_label = ctk.CTkLabel(
             self.bg_frame,
             text="Powered by yt-dlp",
-            font=ctk.CTkFont(family=self.main_font.family(), size=10),
+            font=self.main_font,
             text_color=self.theme["TEXT_VERSION"][0],
             bg_color="transparent"
         )
@@ -280,7 +286,7 @@ class UIController:
         is_audio = self.audio_switch.get()
         
         if url and folder and os.path.isdir(folder):
-            self.master.lock_ui("Downloading...")
+            self.lock_ui("Downloading...")
             self.download_manager.download_media(
                 url, folder, is_audio,
                 progress_callback=self.download_progress_hook,
