@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, Callable
 import os
 import sys
 import shutil
+from utilities import MyLogger
 
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
