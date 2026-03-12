@@ -35,17 +35,18 @@ class DownloadManager:
             if not ffmpeg_path:
                 raise FileNotFoundError("FFmpeg not found in PATH")
             
-            # Set up yt-dlp options
-            ydl_opts = {
-                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
-                'restrictfilenames': True,
-                'noplaylist': True,
-                'ffmpeg_location': ffmpeg_path,
-                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
-                'logger': self.logger,
-                'progress_hooks': [self],
+            # downloader.py – inside DownloadManager.download_media                                                       
+            ydl_opts = {                                                                                          
+                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',                           
+                'restrictfilenames': True,                                                                        
+                'noplaylist': True,                                                                               
+                'ffmpeg_location': ffmpeg_path,                                                                   
+                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),                                    
+                'logger': self.logger,                                                                            
+                'progress_hooks': [self],                                                                         
+                # <‑‑ NEW: tell yt‑dlp which JS runtime to use                                                    
+                'js_runtimes': 'deno',          # or 'node', 'bun', etc.                                          
             }
-            
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
                 
