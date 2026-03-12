@@ -5,6 +5,8 @@ import os
 import sys    
 import shutil
 import yt_dlp
+from downloader import DownloadManager
+from .utilities import get_resource_path, MyLogger
 
 def get_ffmpeg_path():        
     if getattr(sys, 'frozen', False):        
@@ -20,12 +22,6 @@ def get_ffmpeg_path():
         if ffmpeg_path is None:        
             raise FileNotFoundError("ffmpeg not found in PATH")        
         return ffmpeg_path    
-
-def get_resource_path(relative_path: str): 
-    try:        
-        base_path = sys._MEIPASS    
-    except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
 
 # --- PYINSTALLER NOCONSOLE FIX ---        
 # If the app is compiled without a console, route all print statements to a black hole      
@@ -54,7 +50,8 @@ class UniversalDownloader(ctk.CTk):
         # Backgrounds & Tracks                
         self.APP_BG = ("#ebebeb", "#242424")  # Matches System background            
         self.ENTRY_BG = ("#fcfcfc", "#343434")  # Subtle fill for inputs
-           
+   
+        
         # Borders & States        
         self.BORDER_HIDDEN = self.APP_BG  # Disappears into background        
         self.BORDER_DEFAULT = ("#999999", "#444444")  # Soft grey (idle)        
@@ -67,13 +64,15 @@ class UniversalDownloader(ctk.CTk):
         self.BTN_HOVER = ("#EBEBEB", "#555555")  # Soft hover for ghost buttons                                            
         self.TEXT_DISABLED = ("#CECECE", "#666666")  # Disabled button text                                                
         self.ACTION_TEXT = ("#EBEBEB", "#EBEBEB")  # Text on action button
-           
+   
+        
         # Progress & Text        
         self.PROG_FILL = ("#1976D2", "#1976D2")  # Bouncing bar color            
         self.TEXT_MAIN = ("#444444", "#D4D4D4")  # Main text color (labels, entries when filled)                           
         self.TEXT_GHOST = ("#666666", "#d4d4d4")  # Placeholder text color        
         self.TEXT_VERSION = ("#888888", "#555555")  # Version and credits text
-           
+   
+        
         # --- CROSS-PLATFORM FONT DETECTION ---        
         if sys.platform == "darwin":  # macOS            
             MAIN_FONT_FAMILY = ".AppleSystemUIFont"            
@@ -91,7 +90,8 @@ class UniversalDownloader(ctk.CTk):
             self.CLOSE_ICON = "✕"            
             self.MIN_ICON = "—"            
             self.ICON_SIZE = 14
-                   
+   
+            
         # Now create the actual Font object using those constants        
         self.ICON_FONT = ctk.CTkFont(family=self.ICON_FONT_NAME, size=self.ICON_SIZE)
        
@@ -107,7 +107,11 @@ class UniversalDownloader(ctk.CTk):
             
         # Tracks active download        
         self.downloading = False
-           
+        
+        # Initialize the download manager
+        self.download_manager = DownloadManager()
+        self.download_manager.set_progress_hook(self.download_progress_hook)
+       
         # 1. Window Setup        
         self.geometry("500x420")        
         self.title("")
@@ -275,76 +279,12 @@ class UniversalDownloader(ctk.CTk):
         except Exception as e:            
             print(f"FFmpeg setup failed: {e}")
             raise
-                                                                                                                     
-    def download_media(self):                                                                                                          
-        try:                                                                                                                           
-            # Store the total bytes before starting the download                                                                       
-            self._total_bytes = 0                                                                                                      
-                                                                                                                                    
-            # Ensure ffmpeg is properly configured and executable                                                                      
-            ffmpeg_path = self.setup_ffmpeg()                                                                                          
-            if not ffmpeg_path:                                                                                                        
-                raise FileNotFoundError("FFmpeg not found in PATH")                                                                    
-                                                                                                                                    
-            # Retrieve the URL and folder paths from the UI elements                                                                   
-            url = self.url_entry.get().strip()                                                                                         
-            folder = self.folder_entry.get().strip()                                                                                   
-            is_audio = self.audio_switch.get()                                                                                         
-                                                                                                                                    
-            # Set up yt-dlp options                                                                                                    
-            ydl_opts = {                                                                                                               
-                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',                                                
-                'restrictfilenames': True,                                                                                             
-                'noplaylist': True,                                                                                                    
-                'ffmpeg_location': ffmpeg_path,                                                                                        
-                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),                                                         
-                'logger': MyLogger(),                                                                                                  
-                'progress_hooks': [self.download_progress_hook],                                                                       
-            }                                                                                                                          
-                                                                                                                                    
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:                                                                                    
-                ydl.download([url])                                                                                                    
-                                                                                                                                    
-            # Show success popup                                                                                                       
-            self.after(0, self.show_popup, "Download Complete!", success=True)                                                         
-            self.after(0, lambda: self.progress_bar.set(100))                                                                          
-                                                                                                                                    
-        except Exception as e:                                                                                                         
-            # Show error popup                                                                                                         
-            self.after(0, lambda e=e: self.show_popup("Download Failed!", success=False, error_detail=str(e)))                         
-        finally:                                                                                                                       
-            # Ensure the UI is unlocked                                                                                                
-            self.after(0, self.unlock_ui)                                                                                              
-            self.after(0, self.validate_inputs)                   
-   
-    def validate_inputs(self, event=None):        
-        url = self.url_entry.get().strip()        
-        folder = self.folder_entry.get().strip()
-       
-        if url and folder and os.path.isdir(folder):            
-            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):                
-                self.download_btn.configure(                    
-                    state="normal",                    
-                    text="Download Now",                    
-                    fg_color=self.ACTION_BTN,                    
-                    hover_color=self.ACTION_HOVER,                    
-                    text_color=self.ACTION_TEXT
-                )        
-        else:            
-            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):                
-                self.download_btn.configure(                    
-                    state="disabled",                    
-                    text="Enter a URL & Location",                    
-                    fg_color=self.BTN_DISABLED,                    
-                    hover_color=self.ACTION_HOVER,                    
-                    text_color_disabled=self.TEXT_DISABLED
-                )
-   
+                                   
     def start_download_thread(self):
-        if self.downloading:            
+        if self.downloading:
             return
-      
-        # Lock the UI before starting the download        
+        
+        # Lock the UI before starting the download
         self.lock_ui("Downloading...")
        
         # Update progress bar setup - start indeterminate until we know total size
@@ -352,9 +292,21 @@ class UniversalDownloader(ctk.CTk):
         self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.start()
        
-        # Create and start the download thread        
-        self.download_thread = threading.Thread(target=self.download_media, daemon=True)
+        # Create and start the download thread using DownloadManager
+        self.download_thread = threading.Thread(
+            target=self.download_manager.download_media,
+            args=(
+                self.url_entry.get().strip(),
+                self.folder_entry.get().strip(),
+                self.audio_switch.get()
+            ),
+            daemon=True
+        )
         self.download_thread.start()
+   
+    def download_progress_hook(self, progress: float) -> None:
+        """Update the progress bar with the current download progress"""
+        self.after(0, lambda p=progress: self.progress_bar.set(p))
    
     def lock_ui(self, button_text):        
         self.url_entry.configure(state="disabled")        
@@ -411,30 +363,79 @@ class UniversalDownloader(ctk.CTk):
         
         self.validate_inputs()
    
-    def download_progress_hook(self, d):        
-        try:            
-            # Get total bytes or estimate
-            total = d.get('total_bytes', 0)
-            if total == 0:
-                total = d.get('total_bytes_estimate', 0)
+    def download_media(self):
+        """Deprecated: Use download_manager.download_media instead"""
+        try:
+            # Store the total bytes before starting the download
             
-            # Store the total bytes when we first know them
-            if total > 0 and not hasattr(self, '_total_bytes'):
-                self._total_bytes = total
+            self._total_bytes = 0
             
-            # Calculate progress based on stored total
-            if hasattr(self, '_total_bytes') and self._total_bytes > 0:
-                downloaded = d.get('downloaded_bytes', 0)
-                progress = (downloaded / self._total_bytes) * 100
-                
-                # Schedule UI update on main thread for smooth updates
-                self.after(0, lambda p=progress: self.progress_bar.set(p))
-            else:
-                # If no total available, keep in indeterminate mode
-                pass
+            # Ensure ffmpeg is properly configured and executable            
+            ffmpeg_path = self.setup_ffmpeg()
+           
+            if not ffmpeg_path:
+                raise FileNotFoundError("FFmpeg not found in PATH")
+           
+            # Retrieve the URL and folder paths from the UI elements
             
-        except Exception as e:            
-            print(f"Progress hook error: {e}")
+            url = self.url_entry.get().strip()
+            folder = self.folder_entry.get().strip()
+            is_audio = self.audio_switch.get()
+            
+            # Set up yt-dlp options
+            
+            ydl_opts = {
+                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+                'restrictfilenames': True,
+                'noplaylist': True,
+                'ffmpeg_location': ffmpeg_path,
+                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
+                'logger': MyLogger(),
+                'progress_hooks': [self.download_progress_hook],
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            
+            # Show success popup
+            
+            self.after(0, self.show_popup, "Download Complete!", success=True)
+            
+            self.after(0, lambda: self.progress_bar.set(100))
+            
+        except Exception as e:
+            # Show error popup
+            
+            self.after(0, lambda e=e: self.show_popup("Download Failed!", success=False, error_detail=str(e)))
+        finally:
+            # Ensure the UI is unlocked
+            
+            self.after(0, self.unlock_ui)
+            
+            self.after(0, self.validate_inputs)
+   
+    def validate_inputs(self, event=None):        
+        url = self.url_entry.get().strip()        
+        folder = self.folder_entry.get().strip()
+       
+        if url and folder and os.path.isdir(folder):            
+            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):                
+                self.download_btn.configure(                    
+                    state="normal",                    
+                    text="Download Now",                    
+                    fg_color=self.ACTION_BTN,                    
+                    hover_color=self.ACTION_HOVER,                    
+                    text_color=self.ACTION_TEXT
+                )        
+        else:            
+            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):                
+                self.download_btn.configure(                    
+                    state="disabled",                    
+                    text="Enter a URL & Location",                    
+                    fg_color=self.BTN_DISABLED,                    
+                    hover_color=self.ACTION_HOVER,                    
+                    text_color_disabled=self.TEXT_DISABLED
+                )
    
     def show_popup(self, title, success, error_detail=None):        
         # Set popup appearance mode to match main window        
@@ -449,7 +450,7 @@ class UniversalDownloader(ctk.CTk):
             popup.wm_attributes("-type", "dialog")
            
         popup.grab_set()  # Make the popup modal
-       
+    
         width, height = 350, 140            
         center_x = self.winfo_x() + (self.winfo_width() // 2) - (width // 2)        
         center_y = self.winfo_y() + (self.winfo_height() // 2) - (height // 2)        
