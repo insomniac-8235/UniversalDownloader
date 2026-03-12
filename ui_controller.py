@@ -198,6 +198,7 @@ class UIController:
             self.bg_frame,
             text=f"v0.2.1",
             font=self.main_font,
+            fontsize=10,
             text_color=self.theme["TEXT_VERSION"],
             bg_color="transparent"
         )
@@ -207,6 +208,7 @@ class UIController:
             self.bg_frame,
             text="Powered by yt-dlp",
             font=self.main_font,
+            fontsize=10,
             text_color=self.theme["TEXT_VERSION"],
             bg_color="transparent"
         )
