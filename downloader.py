@@ -7,7 +7,6 @@ import shutil
 from utilities import MyLogger, get_deno_path
 
 
-
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
         base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
@@ -21,12 +20,13 @@ def get_ffmpeg_path():
             raise FileNotFoundError("ffmpeg not found in PATH")
         return ffmpeg_path
 
+
 class DownloadManager:
     def __init__(self, logger=None):
         self.logger = logger or MyLogger()
         self.progress_hook = None
         
-        # ← NEW: keep the path once we discover it
+        # Cache the Deno path once we discover it
         self._deno_path = get_deno_path()
         
     def download_media(self, url: str, folder: str, is_audio: bool) -> bool:
@@ -35,32 +35,22 @@ class DownloadManager:
             # Store the total bytes before starting the download
             self._total_bytes = 0
             
-            # Resolve Deno binary before building yt-dlp options
-            deno_path = get_deno_path()
-            
             # Ensure ffmpeg is properly configured
             ffmpeg_path = get_ffmpeg_path()
             if not ffmpeg_path:
                 raise FileNotFoundError("FFmpeg not found in PATH")
             
-            # downloader.py – inside DownloadManager.download_media                      
-                                  
-            ydl_opts = {        
-                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',                           
-                'restrictfilenames': True,   
-                    
-                'noplaylist': True,                                   
+            ydl_opts = {
+                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+                'restrictfilenames': True,
+                'noplaylist': True,
+                'ffmpeg_location': ffmpeg_path,
+                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
+                'logger': self.logger,
+                'progress_hooks': [self],
                 
-                'ffmpeg_location': ffmpeg_path,          
-        
-                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),                                    
-                'logger': self.logger,                    
-                
-                'progress_hooks': [self],                 
-        
-                # ← NEW: tell yt‑dlp exactly which file to run
-                'js_runtimes': {'deno': self._deno_path},         
-    
+                # Use the cached Deno path from __init__
+                'js_runtimes': {'deno': self._deno_path},
             }
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
@@ -112,4 +102,4 @@ class DownloadManager:
 
     def get_deno_path(self) -> str:
         """Get the path to the deno executable"""
-        return get_deno_path()
+        return self._deno_path
