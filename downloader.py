@@ -2,19 +2,7 @@ import yt_dlp
 from yt_dlp import YoutubeDL
 from typing import Optional, Dict, Any, Callable
 import os
-from utilities import get_ffmpeg_path
-
-class MyLogger:
-    def debug(self, msg):
-        # Only print if it's not a noisy progress message
-        if not msg.startswith('[debug] '):
-            print(f"DEBUG: {msg}")
-    
-    def warning(self, msg): 
-        print(f"WARNING: {msg}")
-    
-    def error(self, msg): 
-        print(f"ERROR: {msg}")
+from utilities import get_ffmpeg_path, MyLogger
 
 class DownloadManager:
     def __init__(self, logger=None):

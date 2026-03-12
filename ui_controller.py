@@ -3,10 +3,14 @@ from tkinter import filedialog
 import os
 import sys
 from typing import Callable
+from downloader import DownloadManager
+from utilities import MyLogger
 
 class UIController:
-    def __init__(self, root):
+    def __init__(self, root, download_manager, logger):
         self.root = root
+        self.download_manager = download_manager
+        self.logger = logger
         self.setup_ui()
         self.bind_events()
         
@@ -21,7 +25,6 @@ class UIController:
             "ACTION_BTN": ("#1976D2", "#1976D2"),
             "BTN_DISABLED": ("#FCFCFC", "#343434"),
             "ACTION_HOVER": ("#448BD3", "#448BD3"),
-            "BTN_HOVER": ("#EBEBEB", "#555555"),
             "TEXT_DISABLED": ("#CECECE", "#666666"),
             "ACTION_TEXT": ("#EBEBEB", "#EBEBEB"),
             "PROG_FILL": ("#1976D2", "#1976D2"),
@@ -277,7 +280,21 @@ class UIController:
         is_audio = self.audio_switch.get()
         
         if url and folder and os.path.isdir(folder):
-            self.master.start_download(url, folder, is_audio)
+            self.master.lock_ui("Downloading...")
+            self.download_manager.download_media(
+                url, folder, is_audio,
+                progress_callback=self.download_progress_hook,
+                completion_callback=self.download_complete
+            )
+    
+    def download_progress_hook(self, progress):
+        """Update the progress bar with the current download progress"""
+        self.after(0, lambda p=progress: self.progress_bar.set(p))
+        
+    def download_complete(self, success, error_detail=None):
+        """Handle download completion or failure"""
+        self.root.unlock_ui()
+        self.show_popup("Download Complete!" if success else "Download Failed!", success, error_detail)
     
     def lock_ui(self, button_text="Downloading..."):
         """Lock all UI elements during download"""
