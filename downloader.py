@@ -26,6 +26,9 @@ class DownloadManager:
         self.logger = logger or MyLogger()
         self.progress_hook = None
         
+        # ← NEW: keep the path once we discover it
+        self._deno_path = get_deno_path()
+        
     def download_media(self, url: str, folder: str, is_audio: bool) -> bool:
         """Handle the actual media download process"""
         try:
@@ -40,17 +43,24 @@ class DownloadManager:
             if not ffmpeg_path:
                 raise FileNotFoundError("FFmpeg not found in PATH")
             
-            # downloader.py – inside DownloadManager.download_media                                                       
-            ydl_opts = {                                                                                          
+            # downloader.py – inside DownloadManager.download_media                      
+                                  
+            ydl_opts = {        
                 'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',                           
-                'restrictfilenames': True,                                                                        
-                'noplaylist': True,                                                                               
-                'ffmpeg_location': ffmpeg_path,                                                                   
+                'restrictfilenames': True,   
+                    
+                'noplaylist': True,                                   
+                
+                'ffmpeg_location': ffmpeg_path,          
+        
                 'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),                                    
-                'logger': self.logger,                                                                            
-                'progress_hooks': [self],                                                                         
-                # <‑‑ NEW: tell yt‑dlp which JS runtime to use                                                    
-                'js_runtimes': 'deno',          # or 'node', 'bun', etc.                                          
+                'logger': self.logger,                    
+                
+                'progress_hooks': [self],                 
+        
+                # ← NEW: tell yt‑dlp exactly which file to run
+                'js_runtimes': {'deno': self._deno_path},         
+    
             }
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
