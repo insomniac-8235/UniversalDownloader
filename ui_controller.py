@@ -406,7 +406,7 @@ class UIController:
         btn = ctk.CTkButton(
             popup,
             text="Close",
-            font=ctk.CTkFont(family=self.main_font.family(), size=14, weight="bold"),
+            font=self.main_font,
             width=120,
             height=36,
             corner_radius=25,
