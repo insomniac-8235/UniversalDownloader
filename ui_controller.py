@@ -278,6 +278,106 @@ class UIController:
         
         if url and folder and os.path.isdir(folder):
             self.master.start_download(url, folder, is_audio)
+    
+    def lock_ui(self, button_text="Downloading..."):
+        """Lock all UI elements during download"""
+        self.url_entry.configure(state="disabled")
+        self.folder_entry.configure(state="disabled")
+        
+        for btn in (self.folder_browse_btn, self.paste_btn):
+            btn.configure(state="disabled", fg_color=self.theme["BTN_DISABLED"][0], hover_color=self.theme["ACTION_HOVER"][0])
+        
+        self.audio_switch.configure(state="disabled")
+        
+        self.download_btn.configure(
+            state="disabled",
+            text=button_text,
+            fg_color=self.theme["BTN_DISABLED"][0],
+            hover_color=self.theme["ACTION_HOVER"][0],
+            text_color_disabled=self.theme["TEXT_DISABLED"][0]
+        )
+    
+    def unlock_ui(self):
+        """Unlock all UI elements after download"""
+        self.url_entry.configure(state="normal")
+        self.folder_entry.configure(state="normal")
+        
+        self.folder_browse_btn.configure(
+            state="normal",
+            fg_color=self.theme["ACTION_BTN"][0],
+            hover_color=self.theme["ACTION_HOVER"][0]
+        )
+        
+        self.paste_btn.configure(
+            state="normal",
+            fg_color=self.theme["ACTION_BTN"][0],
+            hover_color=self.theme["ACTION_HOVER"][0]
+        )
+        
+        self.audio_switch.configure(
+            state="normal",
+            progress_color=self.theme["ACTION_BTN"][0],
+            fg_color=self.theme["ENTRY_BG"][0],
+            button_color=self.theme["ACTION_BTN"][0]
+        )
+        
+        self.download_btn.configure(
+            text="Enter a URL & Location",
+            state="disabled",
+            fg_color=self.theme["BTN_DISABLED"][0]
+        )
+        
+        self.progress_bar.stop()
+        self.progress_bar.set(0)
+        
+        self.validate_inputs()
+    
+    def show_popup(self, title, success, error_detail=None):
+        """Show a popup dialog for download completion/failure"""
+        # Create the popup window
+        popup = ctk.CTkToplevel(self.root)
+        popup.resizable(True, True)
+        popup.title("")
+        
+        popup.grab_set()  # Make the popup modal
+        
+        width, height = 350, 140
+        center_x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (width // 2)
+        center_y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{center_x}+{center_y}")
+        
+        label = ctk.CTkLabel(
+            popup,
+            text="Download Complete!" if success else "Download Failed!",
+            wraplength=300,
+            font=self.main_font,
+            text_color=self.theme["TEXT_MAIN"][0]
+        )
+        label.pack(expand=True, pady=(20, 10))
+        
+        if not success:
+            error_label = ctk.CTkLabel(
+                popup,
+                text=f"Error: {error_detail}",
+                wraplength=300,
+                font=self.main_font,
+                text_color=self.theme["TEXT_MAIN"][0]
+            )
+            error_label.pack(pady=(10, 0))
+        
+        btn = ctk.CTkButton(
+            popup,
+            text="Close",
+            font=ctk.CTkFont(family=self.main_font.family(), size=14, weight="bold"),
+            width=120,
+            height=36,
+            corner_radius=25,
+            fg_color=self.theme["ACTION_BTN"][0],
+            hover_color=self.theme["ACTION_HOVER"][0],
+            text_color=self.theme["ACTION_TEXT"][0],
+            command=lambda: (popup.grab_release(), popup.destroy())
+        )
+        btn.pack(pady=(0, 20))
 
 
 download_manager.py
