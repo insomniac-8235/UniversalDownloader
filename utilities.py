@@ -5,6 +5,20 @@ import shutil
 
 def get_deno_path() -> str:
     """Return the absolute path to the Deno binary."""
+    
+    # 0. Portable‐app root – look in `deno_bin/` relative to this file
+    # (works for a normal dev run and for a frozen app)
+    for root_dir in (
+        # If the code is frozen (PyInstaller) – use the temporary folder
+        getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
+        # Otherwise, use the directory that contains the script
+        os.path.dirname(os.path.abspath(__file__)),
+    ):
+        for name in ("deno", "deno.exe"):
+            p = os.path.join(root_dir, "deno_bin", name)
+            if os.path.isfile(p):
+                return p
+
     # 1. Bundled binary (PyInstaller) – look in the temporary _MEIPASS folder
     if getattr(sys, 'frozen', False):
         base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
