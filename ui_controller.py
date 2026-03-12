@@ -378,6 +378,3 @@ class UIController:
             command=lambda: (popup.grab_release(), popup.destroy())
         )
         btn.pack(pady=(0, 20))
-
-
-download_manager.py
