@@ -2,7 +2,21 @@ import yt_dlp
 from yt_dlp import YoutubeDL
 from typing import Optional, Dict, Any, Callable
 import os
-from utilities import get_ffmpeg_path, MyLogger
+import sys
+import shutil
+
+def get_ffmpeg_path():
+    if getattr(sys, 'frozen', False):
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg')
+        if not os.path.exists(ffmpeg_path):
+            ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')  # For Windows
+        return ffmpeg_path
+    else:
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path is None:
+            raise FileNotFoundError("ffmpeg not found in PATH")
+        return ffmpeg_path
 
 class DownloadManager:
     def __init__(self, logger=None):
