@@ -85,12 +85,12 @@ class DownloadManager:
             if total == 0:
                 total = d.get('total_bytes_estimate', 0)
             
-            # Store the total bytes when we first know them
-            if total > 0 and not hasattr(self, '_total_bytes'):
+            # Store the total bytes when we first know them (use value check, not hasattr)
+            if total > 0 and self._total_bytes == 0:
                 self._total_bytes = total
             
             # Calculate progress based on stored total
-            if hasattr(self, '_total_bytes') and self._total_bytes > 0:
+            if self._total_bytes > 0:
                 downloaded = d.get('downloaded_bytes', 0)
                 progress = (downloaded / self._total_bytes) * 100
                 
