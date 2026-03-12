@@ -1,14 +1,10 @@
 import customtkinter as ctk   
-
-
 from tkinter import filedialog    
 import threading    
 import os    
 import sys    
-import shutil    
-
-from yt_dlp import YoutubeDL    
-import time      
+import shutil
+import yt_dlp
 
 def get_ffmpeg_path():        
     if getattr(sys, 'frozen', False):        
@@ -25,28 +21,12 @@ def get_ffmpeg_path():
             raise FileNotFoundError("ffmpeg not found in PATH")        
         return ffmpeg_path    
 
-def get_resource_path(relative_path: str):    
+def get_resource_path(relative_path: str): 
     try:        
         base_path = sys._MEIPASS    
-    except AttributeError:        
+    except AttributeError:
         base_path = os.path.dirname(os.path.abspath(__file__))
-   
-def set_app_icon(window):        
-    if sys.platform == "win32":        
-        # Windows already embedded via --icon, runtime call optional        
-        icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.ico")        
-        if os.path.exists(icon_path):        
-            window.iconbitmap(icon_path)    
-    elif sys.platform.startswith("linux"):        
-        icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.png")        
-        if os.path.exists(icon_path):        
-            try:                
-                from tkinter import PhotoImage                
-                window.iconphoto(True, PhotoImage(file=icon_path))            
-            except Exception:                
-                pass    
-    # macOS: no runtime icon call needed
-       
+
 # --- PYINSTALLER NOCONSOLE FIX ---        
 # If the app is compiled without a console, route all print statements to a black hole      
 if sys.stdout is None:        
@@ -55,12 +35,10 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
    
 # Set Appearance    
-ctk.set_appearance_mode("system")    
-ctk.set_default_color_theme("blue")    
-ctk.set_widget_scaling(1)  # Forces widgets to render at 100% internal scale    
-ctk.set_window_scaling(1)  # Forces the window to render at 100% internal scale
+ctk.set_appearance_mode("system")   
+ctk.set_default_color_theme("blue")
                    
-class MyLogger:        
+class MyLogger:
     def debug(self, msg):        
         # Only print if it's not a noisy progress message        
         if not msg.startswith('[debug] '):        
@@ -132,16 +110,13 @@ class UniversalDownloader(ctk.CTk):
            
         # 1. Window Setup        
         self.geometry("500x420")        
-        self.title("Universal Media Downloader")
+        self.title("")
        
         # Lock window size        
         self.resizable(False, False)
        
         # 2. Build the UI first! (This fills the 'empty' window)        
         self.setup_ui()
-       
-        # 3. Call your icon logic        
-        set_app_icon(self)
    
     def setup_ui(self):        
         # 1. Main Background        
@@ -300,59 +275,47 @@ class UniversalDownloader(ctk.CTk):
         except Exception as e:            
             print(f"FFmpeg setup failed: {e}")
             raise
-                   
-    def download_media(self):        
-        try:
-            # Store the total bytes before starting the download  
-            self._total_bytes = 0
-            
-            ffmpeg_path = self.setup_ffmpeg()
-           
-            url = self.url_entry.get().strip()
-            folder = self.folder_entry.get().strip()
-            is_audio = self.audio_switch.get()
-           
-            ydl_opts = {            
-                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',                                    
-                'restrictfilenames': True,            
-                'noplaylist': True,            
-                'ffmpeg_location': ffmpeg_path,            
-                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),            
-                'logger': MyLogger(),            
-                'progress_hooks': [self.download_progress_hook],
-            }
-           
-            if is_audio:            
-                ydl_opts['postprocessors'] = [{            
-                    'key': 'FFmpegExtractAudio',            
-                    'preferredcodec': 'mp3',            
-                    'preferredquality': '192'
-                }]
-            else:            
-                ydl_opts['merge_output_format'] = 'mp4'
-           
-            with YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-                self._total_bytes = ydl._total_bytes # Store actual total bytes after download completes
-
-            self.after(0, self.show_popup)
-            self.after(0, self.unlock_ui) 
-       
-        except Exception as e:            
-            self.after(0, lambda: self.show_popup(            
-                "Download Failed!",            
-                success=False,            
-                error_detail=str(e)
-            ))
-            self.progress_bar.stop()
-            self.progress_bar.set(0)
-           
-        finally:            
-            # Ensure UI is unlocked if it wasn't already            
-            self.after(0, self.unlock_ui)            
-            self.downloading = False
-            
-            self.validate_inputs()
+                                                                                                                     
+    def download_media(self):                                                                                                          
+        try:                                                                                                                           
+            # Store the total bytes before starting the download                                                                       
+            self._total_bytes = 0                                                                                                      
+                                                                                                                                    
+            # Ensure ffmpeg is properly configured and executable                                                                      
+            ffmpeg_path = self.setup_ffmpeg()                                                                                          
+            if not ffmpeg_path:                                                                                                        
+                raise FileNotFoundError("FFmpeg not found in PATH")                                                                    
+                                                                                                                                    
+            # Retrieve the URL and folder paths from the UI elements                                                                   
+            url = self.url_entry.get().strip()                                                                                         
+            folder = self.folder_entry.get().strip()                                                                                   
+            is_audio = self.audio_switch.get()                                                                                         
+                                                                                                                                    
+            # Set up yt-dlp options                                                                                                    
+            ydl_opts = {                                                                                                               
+                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',                                                
+                'restrictfilenames': True,                                                                                             
+                'noplaylist': True,                                                                                                    
+                'ffmpeg_location': ffmpeg_path,                                                                                        
+                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),                                                         
+                'logger': MyLogger(),                                                                                                  
+                'progress_hooks': [self.download_progress_hook],                                                                       
+            }                                                                                                                          
+                                                                                                                                    
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:                                                                                    
+                ydl.download([url])                                                                                                    
+                                                                                                                                    
+            # Show success popup                                                                                                       
+            self.after(0, self.show_popup, "Download Complete!", success=True)                                                         
+            self.after(0, lambda: self.progress_bar.set(100))                                                                          
+                                                                                                                                    
+        except Exception as e:                                                                                                         
+            # Show error popup                                                                                                         
+            self.after(0, lambda e=e: self.show_popup("Download Failed!", success=False, error_detail=str(e)))                         
+        finally:                                                                                                                       
+            # Ensure the UI is unlocked                                                                                                
+            self.after(0, self.unlock_ui)                                                                                              
+            self.after(0, self.validate_inputs)                   
    
     def validate_inputs(self, event=None):        
         url = self.url_entry.get().strip()        
@@ -377,7 +340,7 @@ class UniversalDownloader(ctk.CTk):
                     text_color_disabled=self.TEXT_DISABLED
                 )
    
-    def start_download_thread(self):        
+    def start_download_thread(self):
         if self.downloading:            
             return
       
@@ -514,7 +477,7 @@ class UniversalDownloader(ctk.CTk):
        
         if not success:            
             error_label = ctk.CTkLabel(                
-                popup,                
+                popup,
                 text=f"Error: {error_detail}",                
                 wraplength=300,                                
                 font=self.FONT_MAIN,                
