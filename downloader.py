@@ -8,19 +8,32 @@ from utilities import MyLogger
 
 
 def get_deno_path() -> str:
-    """Get the path to the deno executable"""
+    """Return the absolute path to the Deno binary."""
+    # 1. Bundled binary (PyInstaller)
     if getattr(sys, 'frozen', False):
-        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-        deno_path = os.path.join(base_path, 'deno')
-        if not os.path.exists(deno_path):
-            deno_path = os.path.join(base_path, 'deno.exe')
-        if os.path.exists(deno_path):
-            return deno_path
+        base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        for name in ("deno", "deno.exe"):
+            p = os.path.join(base, name)
+            if os.path.isfile(p):
+                return p
 
-    deno_path = shutil.which('deno')
-    if deno_path is None:
-        raise FileNotFoundError("Deno not found in PATH")
-    return deno_path
+    # 2. Environment override
+    env_path = os.getenv("DENO_PATH")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+
+    # 3. Normal PATH lookup
+    p = shutil.which("deno")
+    if p:
+        return p
+
+    # 4. Common Homebrew locations
+    for dir_ in ("/opt/homebrew/bin", "/usr/local/bin"):
+        p = os.path.join(dir_, "deno")
+        if os.path.isfile(p):
+            return p
+
+    raise FileNotFoundError("Deno not found in PATH or common locations")
 
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
