@@ -435,3 +435,16 @@ class UIController:
             command=lambda: (popup.grab_release(), popup.destroy())
         )
         btn.pack(pady=(0, 20))
+
+    def get_build_info(self):                                                                                 
+        """Combines Version Number and Git Commit for the UI."""                                              
+        version = "v0.2.1"  # Manually update this here for each release                                      
+        try:                                                                                                  
+            base_path = os.path.dirname(os.path.abspath(__file__))                                            
+            commit_file_path = os.path.join(base_path, 'assets', 'commit.txt')                                
+            with open(commit_file_path, "r") as f:                                                            
+                commit = f.read().strip()                                                                     
+            return f"{version} ({commit})"                                                                    
+        except Exception:                                                                                     
+            # Fallback for local development                                                                  
+            return f"{version} (Dev)"
