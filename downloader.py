@@ -27,8 +27,12 @@ class DownloadManager:
         self.progress_hook = None
         
         # Cache the Deno path once we discover it
-        self._deno_path = get_deno_path()
-        
+        try:
+            self._deno_path = get_deno_path()
+        except FileNotFoundError:
+            # Keep None – download_media will raise a friendly error
+            self._deno_path = None
+            
     def download_media(self, url: str, folder: str, is_audio: bool) -> bool:
         """Handle the actual media download process"""
         try:
