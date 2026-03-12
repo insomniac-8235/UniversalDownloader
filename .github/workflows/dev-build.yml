@@ -1,10 +1,7 @@
-name: Dev Build
+name: Dev Builds
 
 on:
-  push:
-    branches: ["main"]
-    tags-ignore:
-      - "v*" # Trigger on branch push, but IGNORE if it's a version tag
+  workflow_dispatch: # This is the ONLY trigger now
 
 env:
   APP_NAME: UniversalDownloader
@@ -16,10 +13,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -56,7 +53,7 @@ jobs:
             main.py
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-dev-build
           path: dist/${{ env.APP_NAME }}_win64_beta.exe
@@ -66,12 +63,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: |
@@ -122,7 +119,7 @@ jobs:
           echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           # Use a unique name so it doesn't clash with the Windows artifact
           name: macos-dev-build
