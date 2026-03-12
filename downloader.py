@@ -2,8 +2,7 @@ import yt_dlp
 from yt_dlp import YoutubeDL
 from typing import Optional, Dict, Any, Callable
 import os
-import logging
-from .utilities import get_ffmpeg_path
+from utilities import get_ffmpeg_path
 
 class MyLogger:
     def debug(self, msg):
