@@ -46,6 +46,9 @@ class DownloadManager:
             # Store the total bytes before starting the download
             self._total_bytes = 0
             
+            # Resolve Deno binary before building yt-dlp options
+            deno_path = get_deno_path()
+            
             # Ensure ffmpeg is properly configured
             ffmpeg_path = get_ffmpeg_path()
             if not ffmpeg_path:
