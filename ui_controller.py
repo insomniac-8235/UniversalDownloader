@@ -418,16 +418,7 @@ class UIController:
         )
         label.pack(expand=True, pady=(20, 10))
         
-        # Show error details only for failures
-        if not success and error_detail:
-            error_label = ctk.CTkLabel(
-                popup,
-                text=f"Error: {error_detail}",
-                wraplength=300,
-                font=self.main_font,
-                text_color=self.theme["TEXT_MAIN"]
-            )
-            error_label.pack(pady=(10, 0))
+        # Error details removed - only show title and close button
         
         btn = ctk.CTkButton(
             popup,
