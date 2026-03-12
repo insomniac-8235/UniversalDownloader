@@ -6,6 +6,22 @@ import sys
 import shutil
 from utilities import MyLogger
 
+
+def get_deno_path() -> str:
+    """Get the path to the deno executable"""
+    if getattr(sys, 'frozen', False):
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        deno_path = os.path.join(base_path, 'deno')
+        if not os.path.exists(deno_path):
+            deno_path = os.path.join(base_path, 'deno.exe')
+        if os.path.exists(deno_path):
+            return deno_path
+
+    deno_path = shutil.which('deno')
+    if deno_path is None:
+        raise FileNotFoundError("Deno not found in PATH")
+    return deno_path
+
 def get_ffmpeg_path():
     if getattr(sys, 'frozen', False):
         base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
@@ -94,3 +110,7 @@ class DownloadManager:
     def get_ffmpeg_path(self) -> str:
         """Get the path to the ffmpeg executable"""
         return get_ffmpeg_path()
+
+    def get_deno_path(self) -> str:
+        """Get the path to the deno executable"""
+        return get_deno_path()
