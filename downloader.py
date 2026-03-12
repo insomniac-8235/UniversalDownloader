@@ -44,6 +44,12 @@ class DownloadManager:
             if not ffmpeg_path:
                 raise FileNotFoundError("FFmpeg not found in PATH")
             
+            # Make sure we have a Deno binary before proceeding
+            if not self._deno_path:
+                raise FileNotFoundError(
+                    "Deno binary not found. Please install Deno or set DENO_PATH."
+                )
+
             ydl_opts = {
                 'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
                 'restrictfilenames': True,
@@ -53,8 +59,14 @@ class DownloadManager:
                 'logger': self.logger,
                 'progress_hooks': [self],
                 
-                # Use the cached Deno path from __init__
-                'js_runtimes': {'deno': self._deno_path},
+                # Correctly-structured js_runtimes:
+                #   runtime name → config dict (executable_path + options list)
+                'js_runtimes': {
+                    'deno': {
+                        'executable_path': self._deno_path,
+                        'options': []          # ← leave empty unless extra flags are needed
+                    }
+                },
             }
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
