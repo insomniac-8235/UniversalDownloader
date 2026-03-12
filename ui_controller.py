@@ -3,7 +3,7 @@ from tkinter import filedialog
 import os
 import sys
 import threading
-from typing import Callable
+from typing import Callable, Optional
 from downloader import DownloadManager
 from utilities import MyLogger
 from yt_dlp import YoutubeDL
@@ -395,7 +395,7 @@ class UIController:
         
         self.validate_inputs()
     
-    def show_popup(self, title, success, error_detail=None):
+    def show_popup(self, title: str, success: bool, error_detail: Optional[str] = None):
         """Show a popup dialog for download completion/failure or error."""
         popup = ctk.CTkToplevel(self.root)
         popup.resizable(True, True)
