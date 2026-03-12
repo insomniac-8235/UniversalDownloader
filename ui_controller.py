@@ -325,7 +325,7 @@ class UIController:
         range that CTkProgressBar expects.
         """
         # Ensure we only update the progress bar on the main thread
-        self.after(0, lambda p=progress: self.progress_bar.set(p / 100))
+        self.root.after(0, lambda p=progress: self.progress_bar.set(p / 100))
         
     # New helper method to run the download in a background thread
     def _download_thread(self, url: str, folder: str, is_audio: bool):
