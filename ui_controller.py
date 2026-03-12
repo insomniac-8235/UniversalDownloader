@@ -6,6 +6,7 @@ import threading
 from typing import Callable
 from downloader import DownloadManager
 from utilities import MyLogger
+from yt_dlp import YoutubeDL
 
 class UIController:
     def __init__(self, root, download_manager, logger):
@@ -286,6 +287,17 @@ class UIController:
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
 
+        # NEW: validate the URL before starting the download
+        if url and folder and os.path.isdir(folder):
+            try:
+                # yt‑dlp will raise an exception if the URL is bad
+                YoutubeDL({'quiet': True}).extract_info(url, download=False)
+            except Exception as e:
+                # Show an ERROR popup and stop
+                self.show_popup("ERROR", False, str(e))
+                return
+        # ────────────
+
         if url and folder and os.path.isdir(folder):
             self.lock_ui("Downloading...")
             self.download_manager.set_progress_hook(self.download_progress_hook)
@@ -384,11 +396,10 @@ class UIController:
         self.validate_inputs()
     
     def show_popup(self, title, success, error_detail=None):
-        """Show a popup dialog for download completion/failure"""
-        # Create the popup window
+        """Show a popup dialog for download completion/failure or error."""
         popup = ctk.CTkToplevel(self.root)
         popup.resizable(True, True)
-        popup.title("")
+        popup.title(title)          # use the supplied title
         
         popup.grab_set()  # Make the popup modal
         
@@ -397,16 +408,18 @@ class UIController:
         center_y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
         popup.geometry(f"{width}x{height}+{center_x}+{center_y}")
         
+        # Main message – use the title
         label = ctk.CTkLabel(
             popup,
-            text="Download Complete!" if success else "Download Failed!",
+            text=title,
             wraplength=300,
             font=self.main_font,
             text_color=self.theme["TEXT_MAIN"]
         )
         label.pack(expand=True, pady=(20, 10))
         
-        if not success:
+        # Show error details only for failures
+        if not success and error_detail:
             error_label = ctk.CTkLabel(
                 popup,
                 text=f"Error: {error_detail}",
