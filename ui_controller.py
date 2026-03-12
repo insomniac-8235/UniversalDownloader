@@ -314,7 +314,7 @@ class UIController:
         
     def download_complete(self, success, error_detail=None):
         """Handle download completion or failure"""
-        self.root.unlock_ui()
+        self.unlock_ui()
         self.show_popup("Download Complete!" if success else "Download Failed!", success, error_detail)
     
     def lock_ui(self, button_text="Downloading..."):
