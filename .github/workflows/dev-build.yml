@@ -25,14 +25,26 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Install Deno (Windows)
+        run: choco install deno -y
+      
       - name: Install FFmpeg
         run: choco install ffmpeg -y
 
+      - name: Install Deno (Windows)
+        run: choco install deno -y
+      
       - name: Copy FFmpeg binary
         shell: pwsh
         run: |
           $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
           Copy-Item $ff ffmpeg.exe
+      
+      - name: Copy Deno binary (Windows)
+        shell: pwsh
+        run: |
+          $deno = Get-Command deno | Select-Object -ExpandProperty Source
+          Copy-Item $deno deno.exe
 
       - name: Generate UI Commit File
         shell: bash
@@ -48,6 +60,7 @@ jobs:
             --collect-all yt_dlp `
             --add-data "assets;assets" `
             --add-binary "ffmpeg.exe;." `
+            --add-binary "deno.exe;." `
             --icon "assets/icon.ico" `
             --name "${{ env.APP_NAME }}_win64_beta" `
             main.py
@@ -75,6 +88,9 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Install Deno (macOS)
+        run: brew install deno
+      
       - name: Install FFmpeg (Homebrew)
         run: |
           brew install ffmpeg
@@ -84,6 +100,12 @@ jobs:
           FF=$(which ffmpeg)
           cp "$FF" ./ffmpeg
           chmod +x ffmpeg
+      
+      - name: Copy Deno binary (macOS)
+        run: |
+          DENO=$(which deno)
+          cp "$DENO" ./deno
+          chmod +x deno
 
       - name: Generate UI Commit File
         shell: bash
@@ -98,6 +120,7 @@ jobs:
             --collect-all yt_dlp \
             --add-data "assets:assets" \
             --add-binary "ffmpeg:." \
+            --add-binary "deno:." \
             --icon "assets/icon.icns" \
             --name "${{ env.APP_NAME }}_macOS_beta" \
             main.py
