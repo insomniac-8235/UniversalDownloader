@@ -24,7 +24,7 @@ class UIController:
         # Initialize theme colors
         self.theme = {
             "APP_BG": ("#ebebeb", "#242424"),
-            "ENTRY_BG": ("#fcfcfc", "#343434"),
+            "ENTRY_BG": ("#fcfcfc", "#343424"),
             "BORDER_HIDDEN": ("#ebebeb", "#242424"),
             "BORDER_DEFAULT": ("#999999", "#444444"),
             "ENTRY_FOCUS": ("#1976D2", "#1976D2"),
@@ -287,11 +287,26 @@ class UIController:
         
         if url and folder and os.path.isdir(folder):
             self.lock_ui("Downloading...")
-            self.download_manager.download_media(
-                url, folder, is_audio,
-                progress_callback=self.download_progress_hook,
-                completion_callback=self.download_complete
-            )
+            # Set the progress hook before starting the download
+            self.download_manager.set_progress_hook(self.download_progress_hook)
+            try:
+                success = self.download_manager.download_media(
+                    url, folder, is_audio
+                )
+                if success:
+                    self.download_complete(True)
+            except Exception as e:
+                self.logger.error(f"Download failed: {str(e)}")
+                self.download_complete(False, str(e))
+        else:
+            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
+                self.download_btn.configure(
+                    state="disabled",
+                    text="Enter a URL & Location",
+                    fg_color=self.theme["BTN_DISABLED"][0],
+                    hover_color=self.theme["ACTION_HOVER"][0],
+                    text_color_disabled=self.theme["TEXT_DISABLED"][0]
+                )
     
     def download_progress_hook(self, progress):
         """Update the progress bar with the current download progress"""

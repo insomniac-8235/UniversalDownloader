@@ -72,7 +72,7 @@ class DownloadManager:
                 downloaded = d.get('downloaded_bytes', 0)
                 progress = (downloaded / self._total_bytes) * 100
                 
-                # Schedule UI update on main thread for smooth updates
+                # Call the progress hook if it's been set
                 if self.progress_hook:
                     self.progress_hook(progress)
             else:
