@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import filedialog
 import os
 import sys
+import time
 from utilities.theme import THEME
 from download_queue.thread_pool import ThreadPoolManager
 
@@ -19,7 +20,11 @@ class UIController:
         self.setup_ui()
         self.bind_events()
         self.queue = ThreadPoolManager()
-
+        
+        # Debounce timer for input validation
+        self._debounce_timer = None
+        self._debounce_delay = 300  # 300ms debounce
+        
     def setup_ui(self):
         # Initialize fonts
         if sys.platform == "darwin":
@@ -213,22 +218,32 @@ class UIController:
         self.credit_label.place(x=20, rely=1.0, y=-5, anchor="sw")
         
     def bind_events(self):
-        # URL Entry Events
+        # URL Entry Events - batch updates to respect 10Hz limit
         self.url_entry.bind("<FocusIn>", lambda e: self.on_focus_in(self.url_entry))
         self.url_entry.bind("<FocusOut>", lambda e: self.on_focus_out(self.url_entry))
         self.url_entry.bind("<Enter>", lambda e: self.url_entry.configure(border_color=self.theme["BORDER_HOVER"]))
         self.url_entry.bind("<Leave>", lambda e: self.on_focus_out(self.url_entry))
-        self.url_entry.bind("<KeyRelease>", self.validate_inputs)
+        self.url_entry.bind("<KeyRelease>", self._debounced_validate_inputs)
         
-        # Folder Entry Events
+        # Folder Entry Events - batch updates to respect 10Hz limit
         self.folder_entry.bind("<FocusIn>", lambda e: self.on_focus_in(self.folder_entry))
         self.folder_entry.bind("<FocusOut>", lambda e: self.on_focus_out(self.folder_entry))
         self.folder_entry.bind("<Enter>", lambda e: self.folder_entry.configure(border_color=self.theme["BORDER_HOVER"]))
         self.folder_entry.bind("<Leave>", lambda e: self.on_focus_out(self.folder_entry))
-        self.folder_entry.bind("<KeyRelease>", self.validate_inputs)
+        self.folder_entry.bind("<KeyRelease>", self._debounced_validate_inputs)
         
-        # Download Button
+        # Download Button - batch update on state change
         self.download_btn.configure(command=lambda: self.queue(self.url_entry.get().strip(), self.folder_entry.get().strip(), self.audio_switch.get()))
+        
+    def _debounced_validate_inputs(self, event=None):
+        """Debounced input validation to reduce UI updates"""
+        if self._debounce_timer:
+            self.root.after_cancel(self._debounce_timer)
+            
+        self._debounce_timer = self.root.after(
+            self._debounce_delay,
+            lambda: self.validate_inputs()
+        )
         
     def validate_inputs(self, event=None):
         url = self.url_entry.get().strip()
