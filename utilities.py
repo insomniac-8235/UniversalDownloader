@@ -1,6 +1,25 @@
 import os
 import sys
 import shutil
+from PIL import Image, ImageTk
+
+
+THEME = {
+    "APP_BG": ("#ffffff", "#242424"),
+    "ENTRY_BG": ("#fcfcfc", "#343424"),
+    "BORDER_HIDDEN": ("#ebebeb", "#242424"),
+    "BORDER_DEFAULT": ("#999999", "#444444"),
+    "ENTRY_FOCUS": ("#1976D2", "#1976D2"),
+    "ACTION_BTN": ("#1976D2", "#1976D2"),
+    "BTN_DISABLED": ("#FCFCFC", "#343434"),
+    "ACTION_HOVER": ("#448BD3", "#448BD3"),
+    "TEXT_DISABLED": ("#CECECE", "#666666"),
+    "ACTION_TEXT": ("#EBEBEB", "#EBEBEB"),
+    "PROG_FILL": ("#1976D2", "#1976D2"),
+    "TEXT_MAIN": ("#444444", "#D4D4D4"),
+    "TEXT_GHOST": ("#666666", "#d4d4d4"),
+    "TEXT_VERSION": ("#888888", "#555555")
+}
 
 
 def get_deno_path() -> str:
@@ -113,3 +132,21 @@ class MyLogger:
     
     def error(self, msg): 
         print(f"ERROR: {msg}")
+
+def set_app_icon(window):
+    """Safely sets the window icon using PIL for cross-platform compatibility."""
+    try:
+        icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon.png')
+        
+        if os.path.exists(icon_path):
+            img = Image.open(icon_path)
+            photo = ImageTk.PhotoImage(img)
+            
+            # Use wm_iconphoto for macOS/Linux/Windows compatibility
+            window.wm_iconphoto(False, photo)
+            
+            # Keep reference to prevent garbage collection
+            window._icon_reference = photo
+            
+    except Exception as e:
+        print(f"Icon failed to load: {e}")

@@ -5,7 +5,7 @@ import sys
 import threading
 from typing import Callable, Optional
 from downloader import DownloadManager
-from utilities import MyLogger
+from utilities import MyLogger, THEME, set_app_icon
 from yt_dlp import YoutubeDL
 
 class UIController:
@@ -14,33 +14,19 @@ class UIController:
         self.download_manager = download_manager
         self.logger = logger
         
-        # Global Theme Settings (These are module-level, not instance-level)
-        ctk.set_appearance_mode("system")
-        ctk.set_default_color_theme("blue")
+        # Copy module-level THEME to instance (avoid mutation issues)
+        self.theme = THEME.copy()
         
-        # Instance Settings
+        # Get current mode
+        ctk.set_appearance_mode("system")
+        
+        # Set app icon BEFORE UI setup
+        set_app_icon(self.root)
+        
         self.setup_ui()
         self.bind_events()
 
     def setup_ui(self):
-        # Initialize theme colors
-        self.theme = {
-            "APP_BG": ("#ebebeb", "#242424"),
-            "ENTRY_BG": ("#fcfcfc", "#343424"),
-            "BORDER_HIDDEN": ("#ebebeb", "#242424"),
-            "BORDER_DEFAULT": ("#999999", "#444444"),
-            "ENTRY_FOCUS": ("#1976D2", "#1976D2"),
-            "ACTION_BTN": ("#1976D2", "#1976D2"),
-            "BTN_DISABLED": ("#FCFCFC", "#343434"),
-            "ACTION_HOVER": ("#448BD3", "#448BD3"),
-            "TEXT_DISABLED": ("#CECECE", "#666666"),
-            "ACTION_TEXT": ("#EBEBEB", "#EBEBEB"),
-            "PROG_FILL": ("#1976D2", "#1976D2"),
-            "TEXT_MAIN": ("#444444", "#D4D4D4"),
-            "TEXT_GHOST": ("#666666", "#d4d4d4"),
-            "TEXT_VERSION": ("#888888", "#555555")
-        }
-        
         # Initialize fonts
         if sys.platform == "darwin":
             self.main_font = ctk.CTkFont(family=".AppleSystemUIFont", size=14)
@@ -50,7 +36,7 @@ class UIController:
             self.main_font = ctk.CTkFont(family="Segoe UI", size=14)
             self.input_font = ctk.CTkFont(family="Consolas", size=14)
             self.version_font = ctk.CTkFont(family="Segoe UI", size=10)
-            
+        
         # Create main frames
         self.bg_frame = ctk.CTkFrame(self.root, corner_radius=0)
         self.bg_frame.pack(fill="both", expand=True)
