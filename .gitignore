@@ -2,10 +2,11 @@
 .venv/
 venv/
 env/
+.vscode/
 
 # Ignore Windows Binaries
 assets/*.exe
-dist/*.exe
+dist/
 
 # Ignore Binaries
 ffmpeg
