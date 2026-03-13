@@ -7,8 +7,11 @@ env/
 assets/*.exe
 dist/*.exe
 
-# Ignore Mac Binaries
+# Ignore Binaries
 ffmpeg
+deno
+deno_bin/
+ffmpeg_bin/
 
 # Ignore PyInstaller Build Folders
 dist/
@@ -19,6 +22,6 @@ build/
 __pycache__/
 *.pyc
 .aider*
-docs/.DS_Store
 .DS_Store
-.DS_Store
+CONVENTIONS.md
+.env

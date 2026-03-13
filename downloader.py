@@ -4,27 +4,7 @@ from typing import Optional, Dict, Any, Callable
 import os
 import sys
 import shutil
-from utilities import MyLogger, get_deno_path
-
-
-def get_ffmpeg_path():
-    # 1️⃣  Look in a bundled `ffmpeg_bin/` folder (relative to this file)
-    for name in ("ffmpeg", "ffmpeg.exe"):
-        p = os.path.join(os.path.dirname(__file__), "ffmpeg_bin", name)
-        if os.path.isfile(p):
-            return p
-
-    if getattr(sys, 'frozen', False):
-        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-        ffmpeg_path = os.path.join(base_path, 'ffmpeg')
-        if not os.path.exists(ffmpeg_path):
-            ffmpeg_path = os.path.join(base_path, 'ffmpeg.exe')  # For Windows
-        return ffmpeg_path
-    else:
-        ffmpeg_path = shutil.which('ffmpeg')
-        if ffmpeg_path is None:
-            raise FileNotFoundError("ffmpeg not found in PATH")
-        return ffmpeg_path
+from utilities import MyLogger, get_deno_path, get_ffmpeg_path
 
 
 class DownloadManager:

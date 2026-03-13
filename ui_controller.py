@@ -45,9 +45,11 @@ class UIController:
         if sys.platform == "darwin":
             self.main_font = ctk.CTkFont(family=".AppleSystemUIFont", size=14)
             self.input_font = ctk.CTkFont(family="Menlo", size=14)
+            self.version_font = ctk.CTkFont(family=".AppleSystemUIFont", size=10)
         else:
             self.main_font = ctk.CTkFont(family="Segoe UI", size=14)
             self.input_font = ctk.CTkFont(family="Consolas", size=14)
+            self.version_font = ctk.CTkFont(family="Segoe UI", size=10)
             
         # Create main frames
         self.bg_frame = ctk.CTkFrame(self.root, corner_radius=0)
@@ -196,9 +198,8 @@ class UIController:
         # Version Labels
         self.version_label = ctk.CTkLabel(
             self.bg_frame,
-            text=f"v0.2.1",
-            font=self.main_font,
-            fontsize=10,
+            text=self.get_build_info(),
+            font=self.version_font,
             text_color=self.theme["TEXT_VERSION"],
             bg_color="transparent"
         )
@@ -207,8 +208,7 @@ class UIController:
         self.credit_label = ctk.CTkLabel(
             self.bg_frame,
             text="Powered by yt-dlp",
-            font=self.main_font,
-            fontsize=10,
+            font=self.version_font,
             text_color=self.theme["TEXT_VERSION"],
             bg_color="transparent"
         )

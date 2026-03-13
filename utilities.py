@@ -58,6 +58,50 @@ def get_deno_path() -> str:
     raise FileNotFoundError("Deno not found in PATH or common locations")
 
 
+def get_ffmpeg_path() -> str:
+    """Return the absolute path to the ffmpeg executable."""
+    
+    # 0. Portable‐app root – look in `ffmpeg_bin/` relative to this file
+    for root_dir in (
+        getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
+        os.path.dirname(os.path.abspath(__file__)),
+    ):
+        for name in ("ffmpeg", "ffmpeg.exe"):
+            p = os.path.join(root_dir, "ffmpeg_bin", name)
+            if os.path.isfile(p):
+                return p
+
+    # 1. Bundled binary (PyInstaller) – look in the temporary _MEIPASS folder
+    if getattr(sys, 'frozen', False):
+        base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        for name in ("ffmpeg", "ffmpeg.exe"):
+            p = os.path.join(base, name)
+            if os.path.isfile(p):
+                return p
+
+    # 2. Portable‑app root – look in the directory that contains the executable
+    if getattr(sys, 'frozen', False):
+        root_dir = os.path.dirname(sys.executable)
+    else:
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+    for name in ("ffmpeg", "ffmpeg.exe"):
+        p = os.path.join(root_dir, name)
+        if os.path.isfile(p):
+            return p
+
+    # 3. Environment override
+    env_path = os.getenv("FFMPEG_PATH")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+
+    # 4. Normal PATH lookup
+    p = shutil.which("ffmpeg")
+    if p:
+        return p
+
+    raise FileNotFoundError("FFmpeg not found in PATH or common locations")
+
+
 class MyLogger:
     def debug(self, msg):
         # Only print if it's not a noisy progress message
