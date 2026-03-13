@@ -17,7 +17,6 @@ class UIController:
         # Copy module-level THEME to instance (avoid mutation issues)
         self.theme = THEME.copy()
         
-        # Get current mode
         ctk.set_appearance_mode("system")  # Use system theme (light/dark)
         
         self.setup_ui()
@@ -335,7 +334,7 @@ class UIController:
         if phase == "MERGING":
             self.progress_bar.set(0.5)  # Indeterminate bounce (use fixed intermediate value)
             self.download_btn.configure(
-                state="normal",
+                state="disabled",
                 text="Finalising...",
                 fg_color=self.theme["BTN_ACTION"]
             )
