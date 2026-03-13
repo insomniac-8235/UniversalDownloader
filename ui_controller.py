@@ -271,8 +271,7 @@ class UIController:
             widget.configure(text_color=self.theme["TEXT_MAIN"])
     
     def select_folder(self):
-        folder = filedialog.askdirectory()
-        if folder:
+        if folder := filedialog.askdirectory():
             self.folder_entry.delete(0, "end")
             self.folder_entry.insert(0, folder)
             self.folder_entry.configure(text_color=self.theme["TEXT_MAIN"])
@@ -315,15 +314,14 @@ class UIController:
                 daemon=True
             )
             t.start()
-        else:
-            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
-                self.download_btn.configure(
-                    state="disabled",
-                    text="Enter a URL & Location",
-                    fg_color=self.theme["BTN_DISABLED"],
-                    hover_color=self.theme["BTN_HOVER"],
-                    text_color_disabled=self.theme["TEXT_DISABLED"]
-                )
+        elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
+            self.download_btn.configure(
+                state="disabled",
+                text="Enter a URL & Location",
+                fg_color=self.theme["BTN_DISABLED"],
+                hover_color=self.theme["BTN_HOVER"],
+                text_color_disabled=self.theme["TEXT_DISABLED"]
+            )
     
     def download_progress_hook(self, progress):
         """
@@ -388,7 +386,7 @@ class UIController:
             progress_color=self.theme["BTN_ACTION"],
             fg_color=self.theme["ENTRY_BG"],
             button_color=self.theme["BTN_ACTION"],
-            border_color=["BORDER_DEFAULT"]
+            border_color=self.theme["BORDER_DEFAULT"]
         )
         
         self.download_btn.configure(
