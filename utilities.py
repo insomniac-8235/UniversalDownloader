@@ -136,20 +136,29 @@ class MyLogger:
     def error(self, msg): 
         print(f"ERROR: {msg}")
 
-def set_app_icon(window):
-    """Safely sets the window icon using PIL for cross-platform compatibility."""
-    try:
-        icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon.png')
+class ProgressParser:
+    """Regex-based parser for yt-dlp/ffmpeg log lines"""
+    
+    MERGE_KEYWORDS = ["merging", "postprocessor", "finalising", "writing metadata"]
+    DOWNLOAD_KEYWORDS = ["[download]", "downloading"]
+    
+    @classmethod
+    def detect_phase(cls, progress_info: str) -> str:
+        """
+        Detect if we're downloading or merging from yt-dlp log line.
         
-        if os.path.exists(icon_path):
-            img = Image.open(icon_path)
-            photo = ImageTk.PhotoImage(img)
+        Args:
+            progress_info: Raw progress string from yt-dlp/ffmpeg
             
-            # Use wm_iconphoto for macOS/Linux/Windows compatibility
-            window.wm_iconphoto(False, photo)
-            
-            # Keep reference to prevent garbage collection
-            window._icon_reference = photo
-            
-    except Exception as e:
-        print(f"Icon failed to load: {e}")
+        Returns:
+            "MERGING" or "DOWNLOADING"
+        """
+        info_str = str(progress_info).lower()
+        
+        # Check merge keywords first (higher priority)
+        for keyword in cls.MERGE_KEYWORDS:
+            if keyword in info_str:
+                return "MERGING"
+        
+        # Default to downloading
+        return "DOWNLOADING"

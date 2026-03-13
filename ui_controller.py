@@ -5,7 +5,7 @@ import sys
 import threading
 from typing import Callable, Optional
 from downloader import DownloadManager
-from utilities import MyLogger, THEME, set_app_icon
+from utilities import MyLogger, THEME, ProgressParser
 from yt_dlp import YoutubeDL
 
 class UIController:
@@ -18,10 +18,7 @@ class UIController:
         self.theme = THEME.copy()
         
         # Get current mode
-        ctk.set_appearance_mode("system")
-        
-        # Set app icon BEFORE UI setup
-        set_app_icon(self.root)
+        ctk.set_appearance_mode("system")  # Use system theme (light/dark)
         
         self.setup_ui()
         self.bind_events()
@@ -330,6 +327,21 @@ class UIController:
         """
         # Ensure we only update the progress bar on the main thread
         self.root.after(0, lambda p=progress: self.progress_bar.set(p / 100))
+        
+        # NEW: Detect phase from progress info
+        info_str = str(progress).lower()
+        phase = ProgressParser.detect_phase(info_str)
+        
+        if phase == "MERGING":
+            self.progress_bar.set(0.5)  # Indeterminate bounce (use fixed intermediate value)
+            self.download_btn.configure(
+                state="normal",
+                text="Finalising...",
+                fg_color=self.theme["BTN_ACTION"]
+            )
+        else:
+            # Normal download progress handling...
+            self.progress_bar.set(progress / 100)
         
     # New helper method to run the download in a background thread
     def _download_thread(self, url: str, folder: str, is_audio: bool):
