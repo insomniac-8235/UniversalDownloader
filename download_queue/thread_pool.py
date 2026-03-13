@@ -1,13 +1,13 @@
 import threading
-from download_queue import DownloadQueue
+from .download_queue import DownloadQueue
 from utilities.logger import MyLogger
 from queue import Queue, Empty
 import time
 import subprocess
 
 class ThreadPoolManager:
-    def __init__(self, max_workers=4):
-        self.queue = DownloadQueue(max_workers)
+    def __init__(self, worker, max_workers=4):
+        self.queue = DownloadQueue(worker=worker, max_size=0)
         self.max_workers = max_workers
         self.logger = MyLogger()
         self._thread_pool = []
@@ -71,7 +71,7 @@ class ThreadPoolManager:
                             self._metrics['downloads_completed'] += 1
                         else:
                             self._metrics['downloads_failed'] += 1
-                            
+                    
                     except Exception as e:
                         self.logger.error(f"Worker {worker_id} error: {e}")
                         self._metrics['downloads_failed'] += 1
@@ -93,3 +93,8 @@ class ThreadPoolManager:
     def get_metrics(self):
         """Get download metrics"""
         return self._metrics.copy()
+
+    def __call__(self, url: str, folder: str, is_audio: bool):
+        """Create a task and add it to the download queue."""
+        task = {'url': url, 'folder': folder, 'is_audio': is_audio}
+        self.queue.enqueue(task)

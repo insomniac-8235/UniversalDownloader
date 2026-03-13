@@ -1,12 +1,12 @@
 from yt_dlp import YoutubeDL
 from typing import Optional, Dict, Any, Callable
 import os
-import utilities.logger
-from utilities.path_utils import get_deno_path, get_ffmpeg_path
+from utilities.logger import MyLogger
+from utilities.path_utils import get_deno_path, get_ffmpeg_path, get_aria2c_path
 
 class DownloadWorker:
     def __init__(self, logger=None):
-        self.logger = logger or utilities.logger.MyLogger()
+        self.logger = logger or MyLogger()
         self.progress_hook = None
         
         # Cache the Deno path once we discover it
@@ -15,6 +15,17 @@ class DownloadWorker:
         except FileNotFoundError:
             # Keep None – download_media will raise a friendly error
             self._deno_path = None
+            
+        # Discover and cache the aria2c path
+        self._aria2c_path: Optional[str] = None
+        try:
+            self._aria2c_path = get_aria2c_path()
+            if self._aria2c_path:
+                self.logger.info(f"Found aria2c at: {self._aria2c_path}")
+            else:
+                self.logger.info("aria2c not found. Falling back to default downloader.")
+        except Exception as e:
+            self.logger.warning(f"Could not check for aria2c: {e}")
             
     def download(self, url: str, folder: str, is_audio: bool) -> bool:
         """Handle the actual media download process"""
@@ -51,6 +62,17 @@ class DownloadWorker:
                     }
                 },
             }
+            
+            if self._aria2c_path:
+                self.logger.info("Using aria2c for multi-threaded downloading.")
+                ydl_opts['external_downloader'] = self._aria2c_path
+                ydl_opts['external_downloader_args'] = [
+                    '--summary-interval=1',  # Force progress updates every second
+                    '-x', '16',              # Max 16 connections per server
+                    '-s', '16',              # Split file into 16 parts
+                    '-k', '1M',              # Minimum split size of 1MB
+                ]
+            
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
                 

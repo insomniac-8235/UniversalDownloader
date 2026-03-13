@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+from typing import Optional
 
 class PathCache:
     """Simple cache for binary paths to avoid repeated lookups"""
@@ -8,6 +9,7 @@ class PathCache:
     def __init__(self):
         self._deno_path = None
         self._ffmpeg_path = None
+        self._aria2c_path: Optional[str] = None
     
     def get_deno_path(self) -> str:
         """Return the absolute path to the Deno binary."""
@@ -127,15 +129,28 @@ class PathCache:
                 return self._ffmpeg_path
 
         raise FileNotFoundError("FFmpeg not found in PATH or common locations")
+    
+    def get_aria2c_path(self) -> Optional[str]:
+        """Return the absolute path to the aria2c binary, or None if not found."""
+        if self._aria2c_path is None:
+            path = shutil.which("aria2c")
+            if path:
+                self._aria2c_path = path
+        return self._aria2c_path
 
 
 def get_deno_path() -> str:
     """Return the absolute path to the Deno binary."""
-    cache = PathCache()
-    return cache.get_deno_path()
+    return _path_cache.get_deno_path()
 
 
 def get_ffmpeg_path() -> str:
     """Return the absolute path to the ffmpeg executable."""
-    cache = PathCache()
-    return cache.get_ffmpeg_path()
+    return _path_cache.get_ffmpeg_path()
+
+
+def get_aria2c_path() -> Optional[str]:
+    """Return the absolute path to the aria2c executable."""
+    return _path_cache.get_aria2c_path()
+
+_path_cache = PathCache()

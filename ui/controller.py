@@ -2,15 +2,13 @@ import customtkinter as ctk
 from tkinter import filedialog
 import os
 import sys
-import time
 from utilities.theme import THEME
 from download_queue.thread_pool import ThreadPoolManager
 
 class UIController:
-    def __init__(self, root, worker, logger):
+    def __init__(self, root, queue_manager):
         self.root = root
-        self.worker = worker
-        self.logger = logger
+        self.queue = queue_manager
         
         # Copy module-level THEME to instance (avoid mutation issues)
         self.theme = THEME.copy()
@@ -19,9 +17,6 @@ class UIController:
         
         self.setup_ui()
         self.bind_events()
-        self.queue = ThreadPoolManager()
-        
-        # Debounce timer for input validation
         self._debounce_timer = None
         self._debounce_delay = 300  # 300ms debounce
         
@@ -38,7 +33,7 @@ class UIController:
             self.version_font = ctk.CTkFont(family="Segoe UI", size=10)
             self.button_font = ctk.CTkFont(family="Segoe UI", size=15, weight="bold")
     
-        # Create outer frame FIRST (covers entire window area)
+    # Create outer frame FIRST (covers entire window area)
         self.outer_frame = ctk.CTkFrame(
             self.root, 
             corner_radius=0,
@@ -234,7 +229,22 @@ class UIController:
         
         # Download Button - batch update on state change
         self.download_btn.configure(command=lambda: self.queue(self.url_entry.get().strip(), self.folder_entry.get().strip(), self.audio_switch.get()))
-        
+
+    def get_build_info(self):
+        """Combines Version Number and Git Commit for the UI."""
+        version = "v0.2.1"  # Manually update this here for each release
+        try:
+            # Path to assets/ is relative to the project root, not the ui/ directory.
+            # We go up one level from this file's directory to get the project root.
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            commit_file_path = os.path.join(project_root, 'assets', 'commit.txt')
+            with open(commit_file_path, "r") as f:
+                commit = f.read().strip()
+            return f"{version} ({commit})"
+        except Exception:
+            # Fallback for local development
+            return f"{version} (Dev)"
+
     def _debounced_validate_inputs(self, event=None):
         """Debounced input validation to reduce UI updates"""
         if self._debounce_timer:
@@ -295,19 +305,3 @@ class UIController:
             self.url_entry.delete(0, "end")
             self.url_entry.insert(0, text)
             self.validate_inputs()
-            
-    def on_closing(self):
-        # Stop the queue and all workers
-        self.queue.stop()
-        
-        # Ensure ffmpeg processes are killed immediately (per CONVENTIONS.md)
-        try:
-            import subprocess
-            # Kill any running ffmpeg processes
-            for proc in subprocess.Popen(['taskkill', '/F', '/IM', 'ffmpeg.exe'], 
-                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL):
-                proc.wait(timeout=2)
-        except Exception:
-            pass
-        
-        self.root.destroy()
