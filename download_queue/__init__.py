@@ -1,11 +1,11 @@
-import queue
+import queue as stdlib_queue
 import threading
 from download_worker import DownloadWorker
 from utilities.logger import MyLogger
 
 class DownloadQueue:
     def __init__(self, max_workers=4):
-        self.queue = queue.Queue()
+        self.queue = stdlib_queue.Queue()
         self.workers = []
         self.max_workers = max_workers
         self.logger = MyLogger()
@@ -18,7 +18,7 @@ class DownloadQueue:
     def dequeue(self):
         try:
             return self.queue.get(timeout=1)
-        except queue.Empty:
+        except stdlib_queue.Empty:
             return None
     
     def is_empty(self):
