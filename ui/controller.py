@@ -2,16 +2,13 @@ import customtkinter as ctk
 from tkinter import filedialog
 import os
 import sys
-import threading
-from typing import Callable, Optional
-from downloader import DownloadManager
-from utilities import MyLogger, THEME, ProgressParser
-from yt_dlp import YoutubeDL
+from utilities.theme import THEME
+from download_queue.thread_pool import ThreadPoolManager
 
 class UIController:
-    def __init__(self, root, download_manager, logger):
+    def __init__(self, root, worker, logger):
         self.root = root
-        self.download_manager = download_manager
+        self.worker = worker
         self.logger = logger
         
         # Copy module-level THEME to instance (avoid mutation issues)
@@ -21,6 +18,7 @@ class UIController:
         
         self.setup_ui()
         self.bind_events()
+        self.queue = ThreadPoolManager()
 
     def setup_ui(self):
         # Initialize fonts
@@ -230,7 +228,7 @@ class UIController:
         self.folder_entry.bind("<KeyRelease>", self.validate_inputs)
         
         # Download Button
-        self.download_btn.configure(command=lambda: self.on_download_button_click())
+        self.download_btn.configure(command=lambda: self.queue(self.url_entry.get().strip(), self.folder_entry.get().strip(), self.audio_switch.get()))
         
     def validate_inputs(self, event=None):
         url = self.url_entry.get().strip()
@@ -283,182 +281,18 @@ class UIController:
             self.url_entry.insert(0, text)
             self.validate_inputs()
             
-    def on_download_button_click(self):
-        url = self.url_entry.get().strip()
-        folder = self.folder_entry.get().strip()
-        is_audio = self.audio_switch.get()
-
-        # NEW: validate the URL before starting the download
-        if url and folder and os.path.isdir(folder):
-            try:
-                # yt‑dlp will raise an exception if the URL is bad
-                YoutubeDL({'quiet': True}).extract_info(url, download=False)
-            except Exception as e:
-                # Show an ERROR popup and stop
-                self.show_popup("Error", False, str(e))
-                return
-        # ────────────
-
-        if url and folder and os.path.isdir(folder):
-            self.lock_ui("Downloading...")
-            self.download_manager.set_progress_hook(self.download_progress_hook)
-
-            # Run the download in a background thread so the UI stays responsive
-            t = threading.Thread(
-                target=self._download_thread,
-                args=(url, folder, is_audio),
-                daemon=True
-            )
-            t.start()
-        elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
-            self.download_btn.configure(
-                state="disabled",
-                text="Enter a URL & Location",
-                fg_color=self.theme["BTN_DISABLED"],
-                hover_color=self.theme["BTN_HOVER"],
-                text_color_disabled=self.theme["TEXT_DISABLED"]
-            )
-    
-    def download_progress_hook(self, progress):
-        """
-        Convert the 0-100 percentage from DownloadManager into the 0-1
-        range that CTkProgressBar expects.
-        """
-        # Ensure we only update the progress bar on the main thread
-        self.root.after(0, lambda p=progress: self.progress_bar.set(p / 100))
+    def on_closing(self):
+        # Stop the queue and all workers
+        self.queue.stop()
         
-        # NEW: Detect phase from progress info
-        info_str = str(progress).lower()
-        phase = ProgressParser.detect_phase(info_str)
-        
-        if phase == "MERGING":
-            self.progress_bar.set(0.5)  # Indeterminate bounce (use fixed intermediate value)
-            self.download_btn.configure(
-                state="disabled",
-                text="Finalising...",
-                fg_color=self.theme["BTN_ACTION"]
-            )
-        else:
-            # Normal download progress handling...
-            self.progress_bar.set(progress / 100)
-        
-    # New helper method to run the download in a background thread
-    def _download_thread(self, url: str, folder: str, is_audio: bool):
+        # Ensure ffmpeg processes are killed immediately (per CONVENTIONS.md)
         try:
-            success = self.download_manager.download_media(url, folder, is_audio)
-            # Schedule the completion callback on the main thread
-            self.root.after(0, self.download_complete, success, None)
-        except Exception as exc:
-            self.logger.error(f"Download failed: {exc}")
-            self.root.after(0, self.download_complete, False, str(exc))
-
-    def download_complete(self, success, error_detail=None):
-        """Handle download completion or failure"""
-        self.unlock_ui()
-        self.show_popup("Download Complete!" if success else "Download Failed!", success, error_detail)
-    
-    def lock_ui(self, button_text="Downloading..."):
-        """Lock all UI elements during download"""
-        self.url_entry.configure(state="disabled")
-        self.folder_entry.configure(state="disabled")
+            import subprocess
+            # Kill any running ffmpeg processes
+            for proc in subprocess.Popen(['taskkill', '/F', '/IM', 'ffmpeg.exe'], 
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL):
+                proc.wait(timeout=2)
+        except Exception:
+            pass
         
-        for btn in (self.folder_browse_btn, self.paste_btn):
-            btn.configure(state="disabled", fg_color=self.theme["BTN_DISABLED"], hover_color=self.theme["BTN_HOVER"])
-        
-        self.audio_switch.configure(state="disabled")
-        
-        self.download_btn.configure(
-            state="disabled",
-            text=button_text,
-            fg_color=self.theme["BTN_DISABLED"],
-            hover_color=self.theme["BTN_ACTION"],
-            text_color_disabled=self.theme["TEXT_DISABLED"]
-        )
-    
-    def unlock_ui(self):
-        """Unlock all UI elements after download"""
-        self.url_entry.configure(state="normal")
-        self.folder_entry.configure(state="normal")
-        
-        self.folder_browse_btn.configure(
-            state="normal",
-            fg_color=self.theme["BTN_ACTION"],
-            hover_color=self.theme["BTN_HOVER"]
-        )
-        
-        self.paste_btn.configure(
-            state="normal",
-            fg_color=self.theme["BTN_ACTION"],
-            hover_color=self.theme["BTN_HOVER"]
-        )
-        
-        self.audio_switch.configure(
-            state="normal",
-            progress_color=self.theme["BTN_ACTION"],
-            fg_color=self.theme["ENTRY_BG"],
-            button_color=self.theme["BTN_ACTION"],
-            border_color=self.theme["BORDER_DEFAULT"]
-        )
-        
-        self.download_btn.configure(
-            text="Enter a URL & Location",
-            state="disabled",
-            fg_color=self.theme["BTN_DISABLED"]
-        )
-        
-        self.progress_bar.stop()
-        self.progress_bar.set(0)
-        
-        self.validate_inputs()
-    
-    def show_popup(self, title: str, success: bool, error_detail: Optional[str] = None):
-        """Show a popup dialog for download completion/failure or error."""
-        popup = ctk.CTkToplevel(self.root)
-        popup.resizable(True, True)
-        popup.title(title)          # use the supplied title
-        
-        popup.grab_set()  # Make the popup modal
-        
-        width, height = 350, 140
-        center_x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (width // 2)
-        center_y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{center_x}+{center_y}")
-        
-        # Main message – use the title
-        label = ctk.CTkLabel(
-            popup,
-            text=title,
-            wraplength=300,
-            font=self.main_font,
-            text_color=self.theme["TEXT_MAIN"]
-        )
-        label.pack(expand=True, pady=(20, 10))
-        
-        # Error details removed - only show title and close button
-        
-        btn = ctk.CTkButton(
-            popup,
-            text="Close",
-            font=self.main_font,
-            width=120,
-            height=36,
-            corner_radius=25,
-            fg_color=self.theme["BTN_ACTION"],
-            hover_color=self.theme["BTN_HOVER"],
-            text_color=self.theme["TEXT_ACTION"],
-            command=lambda: (popup.grab_release(), popup.destroy())
-        )
-        btn.pack(pady=(0, 20))
-
-    def get_build_info(self):                                                                                 
-        """Combines Version Number and Git Commit for the UI."""                                              
-        version = "v0.2.1"  # Manually update this here for each release                                      
-        try:                                                                                                  
-            base_path = os.path.dirname(os.path.abspath(__file__))                                            
-            commit_file_path = os.path.join(base_path, 'assets', 'commit.txt')                                
-            with open(commit_file_path, "r") as f:                                                            
-                commit = f.read().strip()                                                                     
-            return f"{version} ({commit})"                                                                    
-        except Exception:                                                                                     
-            # Fallback for local development                                                                  
-            return f"{version} (Dev)"
+        self.root.destroy()

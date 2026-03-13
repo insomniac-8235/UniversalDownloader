@@ -1,0 +1,20 @@
+THEME = {
+    "APP_BG": ("#ffffff", "#1e1e1e"),
+    "BG_FRAME": ("#ffffff", "#1e1e1e"),
+    "BORDER_DEFAULT": ("#999999", "#4e4f52"),
+    "BORDER_HOVER": ("#1976D2", "#6b6b6b"),
+    "ENTRY_BG": ("#cecece", "#353638"),
+    "ENTRY_HOVER": ("#d4d4d4", "#353638"),
+    "ENTRY_FOCUS": ("#1976D2", "#1976d2"),
+    "BTN_ACTION": ("#1976D2", "#1976d2"),
+    "BTN_DISABLED": ("#d4d4d4", "#353638"),
+    "BTN_HOVER": ("#448BD3", "#448BD3"),
+    "PROG_FILL": ("#1976D2", "#1976D2"),
+    "PROG_BG": ("#d4d4d4", "#353638"),
+    "TEXT_ACTION": ("#EBEBEB", "#c4c4c4"),
+    "TEXT_DISABLED": ("#CECECE", "#4e4f52"),
+    "TEXT_ENTRY": ("#000000", "#353638"),
+    "TEXT_MAIN": ("#444444", "#a7a8ab"),
+    "TEXT_GHOST": ("#666666", "#67676d"),
+    "TEXT_VERSION": ("#888888","#353638")
+}
