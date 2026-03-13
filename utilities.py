@@ -5,22 +5,25 @@ from PIL import Image, ImageTk
 
 
 THEME = {
-    "APP_BG": ("#ffffff", "#242424"),
-    "ENTRY_BG": ("#fcfcfc", "#343424"),
-    "BORDER_HIDDEN": ("#ebebeb", "#242424"),
-    "BORDER_DEFAULT": ("#999999", "#444444"),
+    "APP_BG": ("#ffffff", "#1e1e1e"),
+    "BG_FRAME": ("#ffffff", "#1e1e1e"),
+    "BORDER_DEFAULT": ("#999999", "#4e4f52"),
+    "BORDER_HOVER": ("#1976D2", "#6b6b6b"),
+    "ENTRY_BG": ("#cecece", "#353638"),
+    "ENTRY_HOVER": ("#d4d4d4", "#353638"),
     "ENTRY_FOCUS": ("#1976D2", "#1976D2"),
-    "ACTION_BTN": ("#1976D2", "#1976D2"),
-    "BTN_DISABLED": ("#FCFCFC", "#343434"),
-    "ACTION_HOVER": ("#448BD3", "#448BD3"),
-    "TEXT_DISABLED": ("#CECECE", "#666666"),
-    "ACTION_TEXT": ("#EBEBEB", "#EBEBEB"),
+    "BTN_ACTION": ("#1976D2", "#1976d2"),
+    "BTN_DISABLED": ("#d4d4d4", "#353638"),
+    "BTN_HOVER": ("#448BD3", "#448BD3"),
     "PROG_FILL": ("#1976D2", "#1976D2"),
-    "TEXT_MAIN": ("#444444", "#D4D4D4"),
-    "TEXT_GHOST": ("#666666", "#d4d4d4"),
-    "TEXT_VERSION": ("#888888", "#555555")
+    "PROG_BG": ("#d4d4d4", "#353638"),
+    "TEXT_ACTION": ("#EBEBEB", "#c4c4c4"),
+    "TEXT_DISABLED": ("#CECECE", "#4e4f52"),
+    "TEXT_ENTRY": ("#000000", "#353638"),
+    "TEXT_MAIN": ("#444444", "#a7a8ab"),
+    "TEXT_GHOST": ("#666666", "#67676d"),
+    "TEXT_VERSION": ("#888888","#353638")
 }
-
 
 def get_deno_path() -> str:
     """Return the absolute path to the Deno binary."""
@@ -46,7 +49,7 @@ def get_deno_path() -> str:
             if os.path.isfile(p):
                 return p
 
-    # 2. Portable‑app root – look in the directory that contains the executable
+    # 2. Portable‐app root – look in the directory that contains the executable
     #    (or the script when not frozen). This allows a bundled `deno` next to
     #    the application binary.
     if getattr(sys, 'frozen', False):
@@ -98,7 +101,7 @@ def get_ffmpeg_path() -> str:
             if os.path.isfile(p):
                 return p
 
-    # 2. Portable‑app root – look in the directory that contains the executable
+    # 2. Portable‐app root – look in the directory that contains the executable
     if getattr(sys, 'frozen', False):
         root_dir = os.path.dirname(sys.executable)
     else:

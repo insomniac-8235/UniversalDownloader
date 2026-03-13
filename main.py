@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from downloader import DownloadManager
 from ui_controller import UIController
-from utilities import MyLogger
+from utilities import MyLogger, THEME
 import os
 import sys
 from PIL import Image, ImageTk
@@ -9,13 +9,14 @@ from PIL import Image, ImageTk
 class UniversalDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Universal Downloader")
-        self.geometry("500x420")
+        
+        self.title("")
+        self.geometry("500x400")
         self.resizable(False, False)
+        self.configure(bg=THEME["APP_BG"])
         
         # macOS-specific icon setup (only runs on macOS)
         if sys.platform == "darwin":
-            # Try .png first (most compatible), then .icns, then .ico as fallback
             for icon_ext in [".png", ".icns", ".ico"]:
                 icon_path = os.path.join(os.path.dirname(__file__), 'assets', f'icon{icon_ext}')
                 if os.path.exists(icon_path):
@@ -23,17 +24,13 @@ class UniversalDownloader(ctk.CTk):
                         img = Image.open(icon_path)
                         photo = ImageTk.PhotoImage(img)
                         self.iconphoto(False, photo)
-                        # Keep reference to prevent garbage collection
                         self._icon_reference = photo
-                        break  # Stop after first valid icon
+                        break
                     except Exception as e:
                         print(f"Icon failed to load: {e}")
         
         # Initialize UI controller
         self.controller = UIController(self, DownloadManager(), MyLogger())
-
-    def show_popup(self, title, success, error_detail=None):
-        self.controller.show_popup(title, success, error_detail)
 
 if __name__ == "__main__":
     app = UniversalDownloader()
