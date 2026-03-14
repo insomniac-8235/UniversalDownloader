@@ -36,7 +36,7 @@ class ProgressParser:
         Returns:
             "MERGING", "DOWNLOADING_YT_DLP", or "DOWNLOADING_ARIA2C"
         """
-        info_str = str(progress_info)
+        info_str = progress_info
 
         # Check for aria2c patterns first, as it's a specific download type
         if cls._ARIA2C_PATTERN.search(info_str):
@@ -76,8 +76,8 @@ class ProgressParser:
             'connections': None # For aria2c (int)
         }
 
-        info_str = str(line)
-        
+        info_str = line
+
         if result['phase'] == "DOWNLOADING_ARIA2C":
             aria2c_match = cls._ARIA2C_PATTERN.search(info_str)
             if aria2c_match:
@@ -116,7 +116,7 @@ class ProgressParser:
                     result['speed'] = value / 1024 # Convert KB/s to MiB/s
                 else: # MB/s
                     result['speed'] = value # yt-dlp reports in MB/s, keep as MiB/s roughly
-            
+
             # Extract ETA if present (yt-dlp format)
             eta_match = re.search(r'ETA:\s*(\d+)', info_str)
             if eta_match:
@@ -156,16 +156,16 @@ class ProgressParser:
         match = re.match(r'([\d\.]+)([KMGT]?i?)B(?:/s)?', speed_str, re.IGNORECASE)
         if not match:
             return None
-        value = float(match.group(1))
-        unit = match.group(2).upper() # 'K', 'M', 'G', 'T' or empty for bytes
-        
-        if unit == 'K' or unit == 'KI':
+        value = float(match[1])
+        unit = match[2].upper()
+
+        if unit in ['K', 'KI']:
             return value / 1024 # Convert KiB/s to MiB/s
-        elif unit == 'M' or unit == 'MI':
+        elif unit in ['M', 'MI']:
             return value
-        elif unit == 'G' or unit == 'GI':
+        elif unit in ['G', 'GI']:
             return value * 1024
-        elif unit == 'T' or unit == 'TI':
+        elif unit in ['T', 'TI']:
             return value * 1024 * 1024
         elif not unit: # Bytes/s
             return value / (1024 * 1024)
@@ -176,9 +176,9 @@ class ProgressParser:
         """Converts an ETA string (e.g., "00:00", "1m", "0s") to total seconds."""
         if not eta_str:
             return None
-        
+
         total_seconds = 0
-        
+
         # Handle HH:MM:SS or MM:SS format
         if ':' in eta_str:
             parts = eta_str.split(':')
@@ -193,16 +193,13 @@ class ProgressParser:
             except ValueError:
                 return None # Invalid format
         else: # Handle formats like "1h23m45s", "1m", "0s"
-            hours_match = re.search(r'(\d+)h', eta_str)
-            if hours_match:
+            if hours_match := re.search(r'(\d+)h', eta_str):
                 total_seconds += int(hours_match.group(1)) * 3600
-            
-            minutes_match = re.search(r'(\d+)m', eta_str)
-            if minutes_match:
+
+            if minutes_match := re.search(r'(\d+)m', eta_str):
                 total_seconds += int(minutes_match.group(1)) * 60
-            
-            seconds_match = re.search(r'(\d+)s', eta_str)
-            if seconds_match:
-                total_seconds += int(seconds_match.group(1))
-        
+
+            if seconds_match := re.search(r'(\d+)s', eta_str):
+                total_seconds += int(seconds_match[1])
+
         return total_seconds
