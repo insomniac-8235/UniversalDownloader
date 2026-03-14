@@ -3,84 +3,104 @@ import threading
 from queue import Queue, Empty
 import sys
 
+# Define logging levels for clarity and control
+DEBUG = 10
+INFO = 20
+WARNING = 30
+ERROR = 40
+
 class MyLogger:
-    def __init__(self):
+    def __init__(self, level=INFO):
         self._last_info_time = 0
-        self._last_progress_time = 0
+        self._last_progress_time = 0 # This is for text-based progress messages, not the UI progress bar value
         self._info_lock = threading.Lock()
         self._progress_lock = threading.Lock()
-        self._message_queue = Queue(maxsize=100)
+        self._message_queue = Queue() # No maxsize; handle drops explicitly if needed, but for logs, let it grow or use proper handlers
+        self._level = level # Set the initial logging level
+
+        # Start the processing thread as a daemon so it doesn't prevent app exit
+        self._processing_thread = threading.Thread(target=self._process_queue_loop, daemon=True)
+        self._processing_thread.start()
         
-    def debug(self, msg):
-        # Only print if it's not a noisy progress message
-        if not msg.startswith('[debug] '):
-            print(f"DEBUG: {msg}")
+    def set_level(self, level: int):
+        """Set the current logging level."""
+        self._level = level
+
+    def _log_message(self, level: int, message: str, print_immediately: bool = False):
+        """Internal method to queue a message with its level."""
+        if level >= self._level:
+            try:
+                # Use put_nowait to avoid blocking if the queue gets full, though for logs, usually not an issue
+                # If print_immediately is true, it means it's a critical error that shouldn't wait
+                if print_immediately:
+                    self._print_formatted_message(level, message)
+                else:
+                    self._message_queue.put_nowait((level, message))
+            except Exception:
+                # Fallback print if queueing fails (e.g., queue full, which shouldn't happen without maxsize)
+                self._print_formatted_message(ERROR, f"Failed to queue log message: {message}")
+                
+    def debug(self, msg: str):
+        self._log_message(DEBUG, f"DEBUG: {msg}")
             
-    def warning(self, msg): 
-        print(f"WARNING: {msg}")
+    def warning(self, msg: str): 
+        self._log_message(WARNING, f"WARNING: {msg}")
         
-    def error(self, msg): 
-        print(f"ERROR: {msg}")
+    def error(self, msg: str, exc_info=None): # Added exc_info to match standard logging
+        formatted_msg = f"ERROR: {msg}"
+        if exc_info:
+            import traceback
+            formatted_msg += "\n" + "".join(traceback.format_exception(type(exc_info), exc_info, exc_info.__traceback__))
+        self._log_message(ERROR, formatted_msg, print_immediately=True) # Errors often need immediate attention
         
-    def info(self, msg):
-        """Log informational messages with rate limiting"""
-        # Prevent UI saturation from too many progress updates
+    def info(self, msg: str):
+        """Log informational messages with rate limiting."""
         current_time = time.time()
-        
         with self._info_lock:
             if current_time - self._last_info_time >= 0.1:  # Max 10Hz
-                print(f"INFO: {msg}")
+                self._log_message(INFO, f"INFO: {msg}")
                 self._last_info_time = current_time
                 
-    def progress(self, msg):
-        """Log progress messages with strict rate limiting (max 10Hz)"""
+    def progress(self, msg: str):
+        """Log text-based progress messages with strict rate limiting (max 10Hz).
+           Note: UI progress bar updates are handled by the separate progress_hook callback."""
         current_time = time.time()
-        
         with self._progress_lock:
             if current_time - self._last_progress_time >= 0.1:  # Max 10Hz
-                print(f"PROGRESS: {msg}")
+                # Progress messages are often info-level or debug-level
+                self._log_message(INFO, f"PROGRESS: {msg}")
                 self._last_progress_time = current_time
                 
-    def queue_message(self, msg_type, message):
-        """Queue a message for async logging (non-blocking)"""
-        try:
-            self._message_queue.put_nowait((msg_type, message))
-        except Exception:
-            # Queue is full, drop the message
-            pass
-            
-    def process_queue(self):
-        """Process queued messages in background thread"""
+    def _process_queue_loop(self):
+        """Processes queued messages in a background thread."""
         while True:
             try:
-                msg_type, message = self._message_queue.get(timeout=0.1)
-                
-                if msg_type == 'info':
-                    self.info(message)
-                elif msg_type == 'progress':
-                    self.progress(message)
-                    
+                level, message = self._message_queue.get(timeout=0.5) # Short timeout
+                self._print_formatted_message(level, message)
+                self._message_queue.task_done()
             except Empty:
-                continue
-            except Exception:
-                time.sleep(0.1)
-                continue
+                continue # Keep looping
+            except Exception as e:
+                # Log internal logger errors to stderr directly
+                print(f"CRITICAL LOGGER ERROR: {e}", file=sys.stderr)
+                time.sleep(1) # Prevent busy-waiting on repeated errors
                 
+    def _print_formatted_message(self, level: int, message: str):
+        """Prints a message to stdout/stderr, respecting its level."""
+        if level >= self._level:
+            # For ERROR, print to stderr
+            if level >= ERROR:
+                print(message, file=sys.stderr)
+            else:
+                print(message, file=sys.stdout)
+
     def flush(self):
-        """Flush all queued messages immediately"""
-        while not self._message_queue.empty():
-            try:
-                msg_type, message = self._message_queue.get_nowait()
-                
-                if msg_type == 'info':
-                    self.info(message)
-                elif msg_type == 'progress':
-                    self.progress(message)
-                    
-            except Exception:
-                break
+        """Wait for all queued messages to be processed."""
+        self._message_queue.join()
                 
     def reset_rate_limits(self):
         """Reset rate limiting timers (useful for testing)"""
-        self._last_info_time = 0
-        self._last_progress_time = 0
+        with self._info_lock:
+            self._last_info_time = 0
+        with self._progress_lock:
+            self._last_progress_time = 0
