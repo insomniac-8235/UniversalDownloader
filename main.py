@@ -34,7 +34,7 @@ class UniversalDownloader(ctk.CTk):
         #                 self.iconphoto(False, photo)
         #                 self._icon_reference = photo
         #                 break
-        #             except Exception as e:
+        #               except Exception as e:
         #                 print(f"Icon failed to load: {e}")
         
         # Initialize shared worker instance (single instance for all threads)
