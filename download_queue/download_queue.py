@@ -28,11 +28,11 @@ class DownloadQueue:
             return success
         except KeyError as e:
             # Log missing key in task
-            self.worker.logger.error(f"Task missing required key: {e}")
+            self.worker.logger.error(f"Task missing required key: {e}", exc_info=True)
             return False
         except Exception as e:
             # Log any other exception during download
-            self.worker.logger.error(f"Error executing task {task.get('url', '')}: {e}")
+            self.worker.logger.error(f"Error executing task {task.get('url', '')}: {e}", exc_info=True)
             return False
 
     def size(self) -> int:

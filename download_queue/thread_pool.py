@@ -1,15 +1,18 @@
 import threading
-from .download_queue import DownloadQueue
-from utilities.logger import MyLogger
 from queue import Queue, Empty
 import time
 import subprocess
+from typing import Callable, Dict, Any, Optional # ADDED for type hints for callback
+
+from .download_queue import DownloadQueue
+from utilities.logger import MyLogger, DEBUG
 
 class ThreadPoolManager:
-    def __init__(self, worker, max_workers=4):
+    # REMOVED: controller parameter
+    def __init__(self, worker, max_workers=4): 
         self.queue = DownloadQueue(worker=worker, max_size=0)
         self.max_workers = max_workers
-        self.logger = MyLogger()
+        self.logger = MyLogger(level=DEBUG) 
         self._thread_pool = []
         self._shutdown_event = threading.Event()
         self._metrics = {
@@ -18,7 +21,19 @@ class ThreadPoolManager:
             'total_time': 0,
             'avg_download_speed': 0
         }
+        # REMOVED: Direct controller storage and connection
+        # self.controller = controller 
+        # if self.controller:
+        #     self.queue.set_worker_progress_hook(self.controller.on_progress_update)
+        self._ui_progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None # ADDED: For UI indeterminate progress bar updates
         
+    def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]):
+        """Set the UI progress callback for the thread pool manager.
+           This callback will be passed to the worker's progress hook."""
+        self._ui_progress_callback = callback
+        if self.queue.worker:
+            self.queue.worker.set_progress_hook(callback)
+
     def start(self):
         """Start the thread pool with proper lifecycle management"""
         self._shutdown_event.clear()
@@ -75,7 +90,7 @@ class ThreadPoolManager:
                             self._metrics['downloads_failed'] += 1
                     
                     except Exception as e:
-                        self.logger.error(f"Worker {worker_id} error: {e}")
+                        self.logger.error(f"Worker {worker_id} error: {e}", exc_info=True) # Added exc_info
                         self._metrics['downloads_failed'] += 1
                         # Notify UI of error
                         self._notify_error(task, str(e))
@@ -83,10 +98,12 @@ class ThreadPoolManager:
             except Empty:
                 continue
             except Exception as e:
-                self.logger.error(f"Worker {worker_id} exception: {e}")
+                self.logger.error(f"Worker {worker_id} exception: {e}", exc_info=True) # Added exc_info
                 
     def _notify_completion(self, task):
         """Notify UI controller of download completion"""
+        # Note: self.controller attribute was removed from __init__ per instructions.
+        # This will cause an AttributeError if `self.controller` is accessed directly here.
         if hasattr(self, 'controller') and callable(getattr(self.controller, 'on_download_complete')):
             try:
                 self.controller.on_download_complete(
@@ -95,15 +112,17 @@ class ThreadPoolManager:
                     task['is_audio']
                 )
             except Exception as e:
-                self.logger.error(f"Failed to notify completion: {e}")
+                self.logger.error(f"Failed to notify completion: {e}", exc_info=True)
                 
     def _notify_error(self, task, error_msg):
         """Notify UI controller of download error"""
+        # Note: self.controller attribute was removed from __init__ per instructions.
+        # This will cause an AttributeError if `self.controller` is accessed directly here.
         if hasattr(self, 'controller') and callable(getattr(self.controller, 'on_download_error')):
             try:
                 self.controller.on_download_error(error_msg)
             except Exception as e:
-                self.logger.error(f"Failed to notify error: {e}")
+                self.logger.error(f"Failed to notify error: {e}", exc_info=True)
                 
     def get_status(self):
         """Get comprehensive status with metrics"""
@@ -122,3 +141,4 @@ class ThreadPoolManager:
         """Create a task and add it to the download queue."""
         task = {'url': url, 'folder': folder, 'is_audio': is_audio}
         self.queue.enqueue(task)
+

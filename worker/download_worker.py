@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, Callable
 import os
 from utilities.logger import MyLogger
 from utilities.path_utils import get_deno_path, get_ffmpeg_path, get_aria2c_path
+# REMOVED: from worker.progress_parser import ProgressParser (no longer needed for UI bar)
 
 class DownloadWorker:
     def __init__(self, logger=None):
@@ -25,13 +26,13 @@ class DownloadWorker:
             else:
                 self.logger.info("aria2c not found. Falling back to default downloader.")
         except Exception as e:
-            self.logger.warning(f"Could not check for aria2c: {e}")
+            self.logger.warning(f"Could not check for aria2c: {e}", exc_info=True)
             
     def download(self, url: str, folder: str, is_audio: bool) -> bool:
         """Handle the actual media download process"""
         try:
-            # Store the total bytes before starting the download
-            self._total_bytes = 0
+            # REMOVED: _total_bytes is no longer needed for indeterminate progress
+            # self._total_bytes = 0 
             
             # Ensure ffmpeg is properly configured
             ffmpeg_path = get_ffmpeg_path()
@@ -71,6 +72,7 @@ class DownloadWorker:
                     '-x', '16',              # Max 16 connections per server
                     '-s', '16',              # Split file into 16 parts
                     '-k', '1M',              # Minimum split size of 1MB
+                    '-c'                     # ADDED: Ensure continue/resume functionality per CONVENTIONS.md
                 ]
             
             with YoutubeDL(ydl_opts) as ydl:
@@ -93,36 +95,19 @@ class DownloadWorker:
             
     def download_progress_hook(self, d: Dict[str, Any]) -> None:
         """Progress hook for yt-dlp to update download progress"""
-        try:
-            # Get total bytes or estimate
-            total = d.get('total_bytes', 0)
-            if total == 0:
-                total = d.get('total_bytes_estimate', 0)
-            
-            # Store the total bytes when we first know them (use value check, not hasattr)
-            if total > 0 and self._total_bytes == 0:
-                self._total_bytes = total
-            
-            # Calculate progress based on stored total
-            if self._total_bytes > 0:
-                downloaded = d.get('downloaded_bytes', 0)
-                progress = (downloaded / self._total_bytes) * 100
-                
-                # Call the progress hook if it's been set
-                if self.progress_hook:
-                    self.progress_hook(progress)
-            else:
-                # If no total available, keep in indeterminate mode
-                pass
-            
-        except Exception as e:
-            print(f"Progress hook error: {e}")
+        # Simply pass the entire progress dictionary 'd' to the external hook.
+        # The UIController will interpret the 'status' key for indeterminate progress.
+        if self.progress_hook:
+            try:
+                self.progress_hook(d)
+            except Exception as e:
+                self.logger.error(f"Error in DownloadWorker progress_hook callback: {e}", exc_info=True)
             
     def __call__(self, d: Dict[str, Any]) -> None:
-        """Handle progress updates"""
+        """Handle progress updates (this is called by yt-dlp)"""
         self.download_progress_hook(d)
         
-    def set_progress_hook(self, callback: Callable[[float], None]) -> None:
+    def set_progress_hook(self, callback: Callable[[Dict[str, Any]], None]) -> None: # MODIFIED type hint
         """Set a progress update callback"""
         self.progress_hook = callback
         

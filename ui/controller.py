@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import os
 import sys
+from typing import Dict, Any # ADDED: Import Dict and Any for type hints
 from utilities.theme import THEME
 from download_queue.thread_pool import ThreadPoolManager
 
@@ -18,7 +19,13 @@ class UIController:
         self.setup_ui()
         self.bind_events()
         self._debounce_timer = None
-        self._progress_callback = None
+        # REMOVED: self._progress_callback is no longer needed
+        # self._progress_callback = None
+        
+        # ADDED: Establish the progress callback connection AFTER setup_ui
+        # This connects the UI controller's progress update method directly
+        # to the thread pool, which will then pass it to the worker.
+        self.queue.set_progress_callback(self.on_progress_update)
         
     def setup_ui(self):
         # Initialize fonts
@@ -175,9 +182,9 @@ class UIController:
             fg_color=self.theme["PROG_BG"],
             progress_color=self.theme["PROG_FILL"],
             corner_radius=8,
-            mode="determinate"
+            mode="indeterminate" # CHANGED: Set to indeterminate mode
         )
-        self.progress_bar.set(0)
+        # REMOVED: self.progress_bar.set(0) # Not needed for indeterminate mode
         self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 20))
         
         # Download Button
@@ -246,9 +253,10 @@ class UIController:
             # Fallback for local development
             return f"{version} (Dev)"
 
-    def set_progress_callback(self, callback):
-        """Set the progress callback to be called when download progress updates"""
-        self._progress_callback = callback
+    # REMOVED: set_progress_callback is no longer needed in UIController
+    # def set_progress_callback(self, callback):
+    #     """Set the progress callback to be called when download progress updates"""
+    #     self._progress_callback = callback
         
     def on_focus_in(self, widget):
         widget.configure(border_color=self.theme["ENTRY_FOCUS"])
@@ -281,6 +289,10 @@ class UIController:
 
     def on_download_complete(self, url, folder, is_audio):
         """Handle download completion and show popup"""
+        # ADDED: Stop indeterminate bar and reset visual
+        self.progress_bar.stop() 
+        self.progress_bar.set(0) 
+        
         self.download_btn.configure(
             state="disabled",
             text="Download Complete",
@@ -294,6 +306,10 @@ class UIController:
         
     def on_download_error(self, error_msg):
         """Handle download errors"""
+        # ADDED: Stop indeterminate bar and reset visual
+        self.progress_bar.stop() 
+        self.progress_bar.set(0) 
+        
         self.download_btn.configure(
             state="disabled",
             text="Download Failed",
@@ -305,13 +321,17 @@ class UIController:
         # Show error popup
         self.root.after(100, lambda: messagebox.showerror("Download Error", f"Download failed:\n{error_msg}"))
 
-    def on_progress_update(self, progress):
-        """Handle progress updates from the download worker"""
-        if self._progress_callback:
-            try:
-                self._progress_callback(progress)
-            except Exception as e:
-                print(f"Progress callback error: {e}")
+    def on_progress_update(self, d: Dict[str, Any]): # MODIFIED: Now expects the full 'd' dictionary
+        """Handle progress updates from the download worker to control indeterminate bar"""
+        status = d.get('status')
+        # Schedule the UI update on the main thread to prevent errors
+        if status == 'downloading':
+            self.root.after(0, self.progress_bar.start) # Start indeterminate bar
+        elif status in ['finished', 'error']:
+            self.root.after(0, self.progress_bar.stop)  # Stop indeterminate bar
+            self.root.after(0, lambda: self.progress_bar.set(0)) # Reset to empty
+        # If 'status' is not downloading, finished, or error, the bar remains in its current state
+        # (e.g., pre-processing state, where it might be stopped initially or awaiting status).
 
     def validate_inputs(self):
         """Validate inputs and enable/disable download button based on validity"""
