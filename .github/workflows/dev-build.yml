@@ -86,7 +86,7 @@ jobs:
 
       - name: Upload Artifact
         # Pinned to v6; Dependabot can suggest updates safely
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: windows-dev-build
           path: dist/${{ env.APP_NAME }}/*_beta_*.exe
@@ -162,7 +162,7 @@ jobs:
           echo "artifact=${APP_NAME}_beta_$SHORT_SHA.dmg" >> $GITHUB_OUTPUT
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: macos-dev-build
           path: ${{ steps.rename_dmg.outputs.artifact }}

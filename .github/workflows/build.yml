@@ -69,7 +69,7 @@ jobs:
           echo "artifact=dist/$newName" >> $env:GITHUB_OUTPUT
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: windows-bin
           path: ${{ steps.rename.outputs.artifact }}
@@ -163,7 +163,7 @@ jobs:
           echo "artifact=$new_name" >> $GITHUB_OUTPUT
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: macos-bin
           path: ${{ steps.rename.outputs.artifact }}
