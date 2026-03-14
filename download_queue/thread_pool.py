@@ -69,17 +69,41 @@ class ThreadPoolManager:
                         
                         if success:
                             self._metrics['downloads_completed'] += 1
+                            # Notify UI of completion
+                            self._notify_completion(task)
                         else:
                             self._metrics['downloads_failed'] += 1
                     
                     except Exception as e:
                         self.logger.error(f"Worker {worker_id} error: {e}")
                         self._metrics['downloads_failed'] += 1
+                        # Notify UI of error
+                        self._notify_error(task, str(e))
                         
             except Empty:
                 continue
             except Exception as e:
                 self.logger.error(f"Worker {worker_id} exception: {e}")
+                
+    def _notify_completion(self, task):
+        """Notify UI controller of download completion"""
+        if hasattr(self, 'controller') and callable(getattr(self.controller, 'on_download_complete')):
+            try:
+                self.controller.on_download_complete(
+                    task['url'], 
+                    task['folder'], 
+                    task['is_audio']
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to notify completion: {e}")
+                
+    def _notify_error(self, task, error_msg):
+        """Notify UI controller of download error"""
+        if hasattr(self, 'controller') and callable(getattr(self.controller, 'on_download_error')):
+            try:
+                self.controller.on_download_error(error_msg)
+            except Exception as e:
+                self.logger.error(f"Failed to notify error: {e}")
                 
     def get_status(self):
         """Get comprehensive status with metrics"""

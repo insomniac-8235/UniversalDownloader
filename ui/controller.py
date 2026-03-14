@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import os
 import sys
 from utilities.theme import THEME
@@ -306,3 +306,29 @@ class UIController:
             self.url_entry.delete(0, "end")
             self.url_entry.insert(0, text)
             self.validate_inputs()
+
+    def on_download_complete(self, url, folder, is_audio):
+        """Handle download completion and show popup"""
+        self.download_btn.configure(
+            state="disabled",
+            text="Download Complete",
+            fg_color=self.theme["BTN_ACTION"],
+            hover_color=self.theme["BTN_HOVER"],
+            text_color=self.theme["TEXT_ACTION_BTN"]
+        )
+        
+        # Show completion popup after a short delay
+        self.root.after(100, lambda: messagebox.showinfo("Download Complete", f"Download completed successfully!\nLocation: {folder}"))
+        
+    def on_download_error(self, error_msg):
+        """Handle download errors"""
+        self.download_btn.configure(
+            state="disabled",
+            text="Download Failed",
+            fg_color=self.theme["BTN_DISABLED"],
+            hover_color=self.theme["BTN_HOVER"],
+            text_color_disabled=self.theme["TEXT_DISABLED"]
+        )
+        
+        # Show error popup
+        self.root.after(100, lambda: messagebox.showerror("Download Error", f"Download failed:\n{error_msg}"))
