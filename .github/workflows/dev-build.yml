@@ -53,10 +53,10 @@ jobs:
       - name: Copy Deno binary
         shell: pwsh
         run: |
-          $deno = Get-Command deno | Select-Object -ExpandProperty Source
-          Copy-Item $deno (Join-Path $PWD "deno.exe")
+          $denoPath = "C:\ProgramData\chocolatey\bin\deno.exe"
+          Copy-Item $denoPath (Join-Path $PWD "deno.exe")
 
-      - name: Generate UI Commit File
+      - name: Generate UI Commit txt File
         shell: bash
         run: |
           mkdir -p assets
