@@ -8,8 +8,8 @@ from .download_queue import DownloadQueue
 from utilities.logger import MyLogger, DEBUG
 
 class ThreadPoolManager:
-    # REMOVED: controller parameter
-    def __init__(self, worker, max_workers=4): 
+    # ADDED: controller parameter
+    def __init__(self, worker, max_workers=4, controller=None): 
         self.queue = DownloadQueue(worker=worker, max_size=0)
         self.max_workers = max_workers
         self.logger = MyLogger(level=DEBUG) 
@@ -21,18 +21,20 @@ class ThreadPoolManager:
             'total_time': 0,
             'avg_download_speed': 0
         }
-        # REMOVED: Direct controller storage and connection
-        # self.controller = controller 
-        # if self.controller:
-        #     self.queue.set_worker_progress_hook(self.controller.on_progress_update)
+        # ADDED: Store controller and connect progress hook
+        self.controller = controller 
+        if self.controller:
+            self.queue.set_worker_progress_hook(self.controller.on_progress_update)
+
         self._ui_progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None # ADDED: For UI indeterminate progress bar updates
         
-    def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]):
-        """Set the UI progress callback for the thread pool manager.
-           This callback will be passed to the worker's progress hook."""
-        self._ui_progress_callback = callback
-        if self.queue.worker:
-            self.queue.worker.set_progress_hook(callback)
+    # REMOVED: set_progress_callback method, as the connection is now in __init__
+    # def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]):
+    #     """Set the UI progress callback for the thread pool manager.
+    #        This callback will be passed to the worker's progress hook."""
+    #     self._ui_progress_callback = callback
+    #     if self.queue.worker:
+    #         self.queue.worker.set_progress_hook(callback)
 
     def start(self):
         """Start the thread pool with proper lifecycle management"""
@@ -90,7 +92,7 @@ class ThreadPoolManager:
                             self._metrics['downloads_failed'] += 1
                     
                     except Exception as e:
-                        self.logger.error(f"Worker {worker_id} error: {e}", exc_info=True) # Added exc_info
+                        self.logger.error(f"Worker {worker_id} error: {e}", exc_info=True)
                         self._metrics['downloads_failed'] += 1
                         # Notify UI of error
                         self._notify_error(task, str(e))
@@ -98,13 +100,12 @@ class ThreadPoolManager:
             except Empty:
                 continue
             except Exception as e:
-                self.logger.error(f"Worker {worker_id} exception: {e}", exc_info=True) # Added exc_info
+                self.logger.error(f"Worker {worker_id} exception: {e}", exc_info=True)
                 
     def _notify_completion(self, task):
         """Notify UI controller of download completion"""
-        # Note: self.controller attribute was removed from __init__ per instructions.
-        # This will cause an AttributeError if `self.controller` is accessed directly here.
-        if hasattr(self, 'controller') and callable(getattr(self.controller, 'on_download_complete')):
+        # MODIFIED: No longer needs hasattr check, controller is guaranteed if set
+        if self.controller and callable(getattr(self.controller, 'on_download_complete')):
             try:
                 self.controller.on_download_complete(
                     task['url'], 
@@ -116,9 +117,8 @@ class ThreadPoolManager:
                 
     def _notify_error(self, task, error_msg):
         """Notify UI controller of download error"""
-        # Note: self.controller attribute was removed from __init__ per instructions.
-        # This will cause an AttributeError if `self.controller` is accessed directly here.
-        if hasattr(self, 'controller') and callable(getattr(self.controller, 'on_download_error')):
+        # MODIFIED: No longer needs hasattr check, controller is guaranteed if set
+        if self.controller and callable(getattr(self.controller, 'on_download_error')):
             try:
                 self.controller.on_download_error(error_msg)
             except Exception as e:
@@ -141,4 +141,3 @@ class ThreadPoolManager:
         """Create a task and add it to the download queue."""
         task = {'url': url, 'folder': folder, 'is_audio': is_audio}
         self.queue.enqueue(task)
-

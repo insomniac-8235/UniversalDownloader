@@ -2,6 +2,7 @@ import time
 import threading
 from queue import Queue, Empty
 import sys
+import traceback # ADD THIS IMPORT
 
 # Define logging levels for clarity and control
 DEBUG = 10
@@ -46,11 +47,17 @@ class MyLogger:
     def warning(self, msg: str): 
         self._log_message(WARNING, f"WARNING: {msg}")
         
-    def error(self, msg: str, exc_info=None): # Added exc_info to match standard logging
+    def error(self, msg: str, exc_info=False): # MODIFIED: Default exc_info to False
         formatted_msg = f"ERROR: {msg}"
         if exc_info:
-            import traceback
-            formatted_msg += "\n" + "".join(traceback.format_exception(type(exc_info), exc_info, exc_info.__traceback__))
+            if isinstance(exc_info, bool) and exc_info: # If exc_info is True, fetch current exception
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                if exc_type is not None:
+                    formatted_msg += "\n" + "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            elif isinstance(exc_info, tuple) and len(exc_info) == 3: # If tuple (exc_type, exc_value, exc_traceback)
+                formatted_msg += "\n" + "".join(traceback.format_exception(exc_info[0], exc_info[1], exc_info[2]))
+            elif isinstance(exc_info, BaseException): # If an exception object
+                formatted_msg += "\n" + "".join(traceback.format_exception(type(exc_info), exc_info, exc_info.__traceback__))
         self._log_message(ERROR, formatted_msg, print_immediately=True) # Errors often need immediate attention
         
     def info(self, msg: str):

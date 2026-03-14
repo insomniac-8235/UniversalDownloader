@@ -2,14 +2,15 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import os
 import sys
-from typing import Dict, Any # ADDED: Import Dict and Any for type hints
+from typing import Dict, Any 
 from utilities.theme import THEME
-from download_queue.thread_pool import ThreadPoolManager
+# No need to import ThreadPoolManager here specifically, type hints handle it
 
 class UIController:
-    def __init__(self, root, queue_manager):
+    # MODIFIED: queue_manager can be None initially to handle circular dependency
+    def __init__(self, root, queue_manager=None):
         self.root = root
-        self.queue = queue_manager
+        self.queue = queue_manager # Store queue_manager
         
         # Copy module-level THEME to instance (avoid mutation issues)
         self.theme = THEME.copy()
@@ -19,13 +20,11 @@ class UIController:
         self.setup_ui()
         self.bind_events()
         self._debounce_timer = None
-        # REMOVED: self._progress_callback is no longer needed
-        # self._progress_callback = None
         
-        # ADDED: Establish the progress callback connection AFTER setup_ui
-        # This connects the UI controller's progress update method directly
-        # to the thread pool, which will then pass it to the worker.
-        self.queue.set_progress_callback(self.on_progress_update)
+        # REMOVED: No longer needs to establish progress callback here.
+        # This is now handled when ThreadPoolManager is initialized in main.py
+        # because ThreadPoolManager stores a reference to this UIController.
+        # self.queue.set_progress_callback(self.on_progress_update)
         
     def setup_ui(self):
         # Initialize fonts
@@ -236,7 +235,8 @@ class UIController:
         self.folder_entry.bind("<KeyRelease>", self._debounced_validate_inputs)
         
         # Download Button - batch update on state change
-        self.download_btn.configure(command=lambda: self.queue(self.url_entry.get().strip(), self.folder_entry.get().strip(), self.audio_switch.get()))
+        # ADDED: Ensure self.queue is not None before calling it
+        self.download_btn.configure(command=lambda: self.queue(self.url_entry.get().strip(), self.folder_entry.get().strip(), self.audio_switch.get()) if self.queue else None)
 
     def get_build_info(self):
         """Combines Version Number and Git Commit for the UI."""
@@ -289,39 +289,39 @@ class UIController:
 
     def on_download_complete(self, url, folder, is_audio):
         """Handle download completion and show popup"""
-        # ADDED: Stop indeterminate bar and reset visual
-        self.progress_bar.stop() 
-        self.progress_bar.set(0) 
+        # Ensure UI updates are on the main thread
+        self.root.after(0, lambda: self.progress_bar.stop()) 
+        self.root.after(0, lambda: self.progress_bar.set(0)) 
         
-        self.download_btn.configure(
+        self.root.after(0, lambda: self.download_btn.configure(
             state="disabled",
             text="Download Complete",
             fg_color=self.theme["BTN_ACTION"],
             hover_color=self.theme["BTN_HOVER"],
             text_color=self.theme["TEXT_ACTION_BTN"]
-        )
+        ))
         
         # Show completion popup after a short delay
         self.root.after(100, lambda: messagebox.showinfo("Download Complete", f"Download completed successfully!\nLocation: {folder}"))
         
     def on_download_error(self, error_msg):
         """Handle download errors"""
-        # ADDED: Stop indeterminate bar and reset visual
-        self.progress_bar.stop() 
-        self.progress_bar.set(0) 
+        # Ensure UI updates are on the main thread
+        self.root.after(0, lambda: self.progress_bar.stop()) 
+        self.root.after(0, lambda: self.progress_bar.set(0)) 
         
-        self.download_btn.configure(
+        self.root.after(0, lambda: self.download_btn.configure(
             state="disabled",
             text="Download Failed",
             fg_color=self.theme["BTN_DISABLED"],
             hover_color=self.theme["BTN_HOVER"],
             text_color_disabled=self.theme["TEXT_DISABLED"]
-        )
+        ))
         
         # Show error popup
         self.root.after(100, lambda: messagebox.showerror("Download Error", f"Download failed:\n{error_msg}"))
 
-    def on_progress_update(self, d: Dict[str, Any]): # MODIFIED: Now expects the full 'd' dictionary
+    def on_progress_update(self, d: Dict[str, Any]): 
         """Handle progress updates from the download worker to control indeterminate bar"""
         status = d.get('status')
         # Schedule the UI update on the main thread to prevent errors
