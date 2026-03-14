@@ -36,25 +36,21 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Install Deno
-        shell: pwsh
-        run: choco install deno -y; refreshenv
-
-      - name: Install FFmpeg
-        shell: pwsh
-        run: choco install ffmpeg -y; refreshenv
-
-      - name: Copy FFmpeg binary
+      - name: Install Deno via Chocolatey
         shell: pwsh
         run: |
-          $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
-          Copy-Item $ff (Join-Path $PWD "ffmpeg.exe")
-
-      - name: Copy Deno binary
-        shell: pwsh
-        run: |
+          choco install deno -y
+          refreshenv 
           $denoPath = "C:\ProgramData\chocolatey\bin\deno.exe"
           Copy-Item $denoPath (Join-Path $PWD "deno.exe")
+
+      - name: Install FFmpeg via Chocolatey
+        shell: pwsh
+        run: |
+          choco install ffmpeg -y
+          refreshenv
+          $ffmpegPath = "C:\ProgramData\chocolatey\bin\ffmpeg.exe"
+          Copy-Item $ffmpegPath (Join-Path $PWD "ffmpeg.exe")
 
       - name: Generate UI Commit txt File
         shell: bash
