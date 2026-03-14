@@ -16,52 +16,51 @@ on:
 env:
   APP_NAME: "Universal Downloader"
   VERSION: beta
-
+  
 jobs:
   build-windows:
     name: Build Windows (Dev)
     runs-on: windows-latest
     steps:
       - name: Checkout
-        # Pinned to major v6 for stability; Dependabot can propose minor/patch updates
         uses: actions/checkout@v6
 
       - name: Setup Python
-        # Pinned to major v6; Dependabot can bump minor/patch versions safely
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14.0"
+          python-version: "3.14"
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Install Deno
-        run: choco install deno -y
+        shell: pwsh
+        run: choco install deno -y; refreshenv
 
       - name: Install FFmpeg
-        run: choco install ffmpeg -y
+        shell: pwsh
+        run: choco install ffmpeg -y; refreshenv
 
       - name: Copy FFmpeg binary
         shell: pwsh
         run: |
           $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
-          Copy-Item $ff "$PWD\ffmpeg.exe"
+          Copy-Item $ff (Join-Path $PWD "ffmpeg.exe")
 
       - name: Copy Deno binary
         shell: pwsh
         run: |
           $deno = Get-Command deno | Select-Object -ExpandProperty Source
-          Copy-Item $deno "$PWD\deno.exe"
+          Copy-Item $deno (Join-Path $PWD "deno.exe")
 
       - name: Generate UI Commit File
-        shell: pwsh
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Force -Path assets
-          $shortSHA = $env:GITHUB_SHA.Substring(0,7)
-          $shortSHA | Out-File assets\commit.txt -Encoding utf8
+          mkdir -p assets
+          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
 
       - name: Build Executable
         shell: pwsh
@@ -76,20 +75,12 @@ jobs:
             --name "${{ env.APP_NAME }}" `
             main.py
 
-      - name: Rename Executable to Beta Version
-        shell: pwsh
-        run: |
-          $shortSHA = $env:GITHUB_SHA.Substring(0,7)
-          $src = "dist\${{ env.APP_NAME }}\${{ env.APP_NAME }}.exe"
-          $dst = "dist\${{ env.APP_NAME }}\${{ env.APP_NAME }}_beta_$shortSHA.exe"
-          Rename-Item -Path $src -NewName $dst
-
       - name: Upload Artifact
-        # Pinned to v6; Dependabot can suggest updates safely
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: windows-dev-build
-          path: dist/${{ env.APP_NAME }}/*_beta_*.exe
+          path: dist/${{ env.APP_NAME }}_win64_${{ env.VERSION }}.exe
+
 
   build-macos:
     name: Build macOS (Dev)
