@@ -1,11 +1,21 @@
 name: Dev Builds
 
 on:
-  workflow_dispatch: # This is the ONLY trigger now
+  workflow_dispatch:   # Manual trigger
+  pull_request:
+    branches:
+      - main          # Dependabot PRs
+    paths:
+      - '**/requirements.txt'
+  push:
+    branches:
+      - main          # After merging PRs
+    paths:
+      - '**/requirements.txt'
 
 env:
-  APP_NAME: UniversalDownloader
-  VERSION: beta # Fixed version string for dev builds
+  APP_NAME: "Universal Downloader"
+  VERSION: beta
 
 jobs:
   build-windows:
@@ -13,44 +23,45 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
+        # Pinned to major v6 for stability; Dependabot can propose minor/patch updates
         uses: actions/checkout@v6
 
       - name: Setup Python
+        # Pinned to major v6; Dependabot can bump minor/patch versions safely
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Install Deno (Windows)
+      - name: Install Deno
         run: choco install deno -y
-      
+
       - name: Install FFmpeg
         run: choco install ffmpeg -y
 
-      - name: Install Deno (Windows)
-        run: choco install deno -y
-      
       - name: Copy FFmpeg binary
         shell: pwsh
         run: |
           $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
-          Copy-Item $ff ffmpeg.exe
-      
-      - name: Copy Deno binary (Windows)
+          Copy-Item $ff "$PWD\ffmpeg.exe"
+
+      - name: Copy Deno binary
         shell: pwsh
         run: |
           $deno = Get-Command deno | Select-Object -ExpandProperty Source
-          Copy-Item $deno deno.exe
+          Copy-Item $deno "$PWD\deno.exe"
 
       - name: Generate UI Commit File
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p assets
-          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+          New-Item -ItemType Directory -Force -Path assets
+          $shortSHA = $env:GITHUB_SHA.Substring(0,7)
+          $shortSHA | Out-File assets\commit.txt -Encoding utf8
 
       - name: Build Executable
         shell: pwsh
@@ -62,14 +73,23 @@ jobs:
             --add-binary "ffmpeg.exe;." `
             --add-binary "deno.exe;." `
             --icon "assets/icon.ico" `
-            --name "${{ env.APP_NAME }}_win64_beta" `
+            --name "${{ env.APP_NAME }}" `
             main.py
 
+      - name: Rename Executable to Beta Version
+        shell: pwsh
+        run: |
+          $shortSHA = $env:GITHUB_SHA.Substring(0,7)
+          $src = "dist\${{ env.APP_NAME }}\${{ env.APP_NAME }}.exe"
+          $dst = "dist\${{ env.APP_NAME }}\${{ env.APP_NAME }}_beta_$shortSHA.exe"
+          Rename-Item -Path $src -NewName $dst
+
       - name: Upload Artifact
+        # Pinned to v6; Dependabot can suggest updates safely
         uses: actions/upload-artifact@v6
         with:
           name: windows-dev-build
-          path: dist/${{ env.APP_NAME }}_win64_beta.exe
+          path: dist/${{ env.APP_NAME }}/*_beta_*.exe
 
   build-macos:
     name: Build macOS (Dev)
@@ -81,37 +101,36 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Install Deno (macOS)
+      - name: Install Deno
         run: brew install deno
-      
-      - name: Install FFmpeg (Homebrew)
-        run: |
-          brew install ffmpeg
+
+      - name: Install FFmpeg
+        run: brew install ffmpeg
 
       - name: Copy FFmpeg binary
         run: |
           FF=$(which ffmpeg)
           cp "$FF" ./ffmpeg
           chmod +x ffmpeg
-      
-      - name: Copy Deno binary (macOS)
+
+      - name: Copy Deno binary
         run: |
           DENO=$(which deno)
           cp "$DENO" ./deno
           chmod +x deno
 
       - name: Generate UI Commit File
-        shell: bash
         run: |
           mkdir -p assets
-          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+          echo "${GITHUB_SHA:0:7}" > assets/commit.txt
 
       - name: Build macOS app
         run: |
@@ -122,29 +141,28 @@ jobs:
             --add-binary "ffmpeg:." \
             --add-binary "deno:." \
             --icon "assets/icon.icns" \
-            --name "${{ env.APP_NAME }}_macOS_beta" \
+            --name "${APP_NAME}" \
             main.py
 
       - name: Create DMG with Applications Shortcut
-        id: create_dmg_beta
         run: |
           mkdir -p dist/dmg_staging
-          
           cp -R dist/*.app dist/dmg_staging/
-          
           ln -s /Applications dist/dmg_staging/Applications
-          
-          hdiutil create -volname "${{ env.APP_NAME }} Beta" \
+          hdiutil create -volname "${APP_NAME} Beta" \
             -srcfolder dist/dmg_staging \
             -ov -format UDZO \
-            "${{ env.APP_NAME }}_macOS_beta.dmg"
-          
-          echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
+            "${APP_NAME}_macOS_beta.dmg"
+
+      - name: Rename DMG to Beta Version
+        id: rename_dmg
+        run: |
+          SHORT_SHA=${GITHUB_SHA:0:7}
+          mv "${APP_NAME}_macOS_beta.dmg" "${APP_NAME}_beta_$SHORT_SHA.dmg"
+          echo "artifact=${APP_NAME}_beta_$SHORT_SHA.dmg" >> $GITHUB_OUTPUT
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v6
         with:
-          # Use a unique name so it doesn't clash with the Windows artifact
           name: macos-dev-build
-          # Ensure this path matches the DMG filename created in the previous step
-          path: ${{ steps.create_dmg_beta.outputs.artifact }}
+          path: ${{ steps.rename_dmg.outputs.artifact }}
