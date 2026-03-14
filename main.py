@@ -46,6 +46,12 @@ class UniversalDownloader(ctk.CTk):
         # Initialize UI controller with shared worker
         self.controller = UIController(self, self.queue_manager)
         
+        # Set up progress callback to update the progress bar
+        def on_progress(progress):
+            self.progress_bar.set(progress / 100.0)
+            
+        self.controller.set_progress_callback(on_progress)
+        
         # Start thread pool before showing window
         self.queue_manager.start()
 

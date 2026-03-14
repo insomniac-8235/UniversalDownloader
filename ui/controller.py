@@ -18,7 +18,7 @@ class UIController:
         self.setup_ui()
         self.bind_events()
         self._debounce_timer = None
-        self._debounce_delay = 300  # 300ms debounce
+        self._progress_callback = None
         
     def setup_ui(self):
         # Initialize fonts
@@ -246,37 +246,9 @@ class UIController:
             # Fallback for local development
             return f"{version} (Dev)"
 
-    def _debounced_validate_inputs(self, event=None):
-        """Debounced input validation to reduce UI updates"""
-        if self._debounce_timer:
-            self.root.after_cancel(self._debounce_timer)
-            
-        self._debounce_timer = self.root.after(
-            self._debounce_delay,
-            lambda: self.validate_inputs()
-        )
-        
-    def validate_inputs(self, event=None):
-        url = self.url_entry.get().strip()
-        folder = self.folder_entry.get().strip()
-
-        if url and folder and os.path.isdir(folder):
-            if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
-                self.download_btn.configure(
-                    state="normal",
-                    text="Download Now",
-                    fg_color=self.theme["BTN_ACTION"],
-                    hover_color=self.theme["BTN_HOVER"],
-                    text_color=self.theme["TEXT_ACTION_BTN"]
-                )
-        elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
-            self.download_btn.configure(
-                state="disabled",
-                text="Enter a URL & Location",
-                fg_color=self.theme["BTN_DISABLED"],
-                hover_color=self.theme["BTN_HOVER"],
-                text_color_disabled=self.theme["TEXT_DISABLED"]
-            )
+    def set_progress_callback(self, callback):
+        """Set the progress callback to be called when download progress updates"""
+        self._progress_callback = callback
         
     def on_focus_in(self, widget):
         widget.configure(border_color=self.theme["ENTRY_FOCUS"])
@@ -332,3 +304,11 @@ class UIController:
         
         # Show error popup
         self.root.after(100, lambda: messagebox.showerror("Download Error", f"Download failed:\n{error_msg}"))
+
+    def on_progress_update(self, progress):
+        """Handle progress updates from the download worker"""
+        if self._progress_callback:
+            try:
+                self._progress_callback(progress)
+            except Exception as e:
+                print(f"Progress callback error: {e}")
