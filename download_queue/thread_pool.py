@@ -2,7 +2,7 @@ import threading
 from queue import Queue, Empty
 import time
 import subprocess
-from typing import Callable, Dict, Any, Optional # ADDED for type hints for callback
+from typing import Callable, Dict, Any, Optional 
 
 from .download_queue import DownloadQueue
 from utilities.logger import MyLogger, DEBUG
@@ -24,11 +24,10 @@ class ThreadPoolManager:
         # ADDED: Store controller and connect progress hook
         self.controller = controller 
         if self.controller:
-            self.queue.set_worker_progress_hook(self.controller.on_progress_update)
-
-        self._ui_progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None # ADDED: For UI indeterminate progress bar updates
+            # CORRECTED LINE: Set the progress hook on the worker itself
+            self.queue.worker.set_progress_hook(self.controller.on_progress_update)
         
-    # REMOVED: set_progress_callback method, as the connection is now in __init__
+    # REMOVED: set_progress_callback method, as it's no longer used
     # def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]):
     #     """Set the UI progress callback for the thread pool manager.
     #        This callback will be passed to the worker's progress hook."""
