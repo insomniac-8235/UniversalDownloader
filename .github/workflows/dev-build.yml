@@ -30,7 +30,7 @@ jobs:
         # Pinned to major v6; Dependabot can bump minor/patch versions safely
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.14.0"
 
       - name: Install dependencies
         run: |
@@ -101,7 +101,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: "3.14.0"
 
       - name: Install dependencies
         run: |

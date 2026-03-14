@@ -66,9 +66,7 @@ def get_deno_path() -> str:
     if env_path and os.path.isfile(env_path):
         return env_path
 
-    # 4. Normal PATH lookup
-    p = shutil.which("deno")
-    if p:
+    if p := shutil.which("deno"):
         return p
 
     # 5. Common Homebrew locations
@@ -116,9 +114,7 @@ def get_ffmpeg_path() -> str:
     if env_path and os.path.isfile(env_path):
         return env_path
 
-    # 4. Normal PATH lookup
-    p = shutil.which("ffmpeg")
-    if p:
+    if p := shutil.which("ffmpeg"):
         return p
 
     raise FileNotFoundError("FFmpeg not found in PATH or common locations")
@@ -153,12 +149,10 @@ class ProgressParser:
         Returns:
             "MERGING" or "DOWNLOADING"
         """
-        info_str = str(progress_info).lower()
-        
+        info_str = progress_info.lower()
+
         # Check merge keywords first (higher priority)
-        for keyword in cls.MERGE_KEYWORDS:
-            if keyword in info_str:
-                return "MERGING"
-        
-        # Default to downloading
-        return "DOWNLOADING"
+        return next(
+            ("MERGING" for keyword in cls.MERGE_KEYWORDS if keyword in info_str),
+            "DOWNLOADING",
+        )
