@@ -1,5 +1,4 @@
 import re
-from functools import lru_cache
 from typing import Optional
 
 class ProgressParser:
@@ -9,7 +8,6 @@ class ProgressParser:
     DOWNLOAD_KEYWORDS = ["[download]", "downloading"]
     
     # Compile regex patterns at module load time for performance
-    # Compile regex patterns at module load time for performance
     _MERGE_PATTERN = re.compile(
         r'(?:merging|postprocessor|finalising|writing metadata)',
         re.IGNORECASE
@@ -18,8 +16,14 @@ class ProgressParser:
         r'(?:(?:\[download\]|downloading))',
         re.IGNORECASE
     )
-    # aria2c output pattern as per CONVENTIONS.md: [...] CN:X DL:Y
-    _ARIA2C_PATTERN = re.compile(r'CN:\s*(\d+)\s+DL:\s*([\d.]+)\s*(?:M|K|G)iB/s', re.IGNORECASE)
+    # UPDATED: aria2c pattern to accurately capture percentage, connections, speed, and optional ETA
+    # This pattern matches the provided console output:
+    # [#044aa5 19MiB/805MiB(2%) CN:16 DL:21MiB ETA:36s]
+    # It accounts for the optional downloaded/total size before the percentage.
+    _ARIA2C_PATTERN = re.compile(
+        r'\[#\w+\s+(?:[\d\.]+[KMGT]?i?B/[\d\.]+[KMGT]?i?B)?\((?P<percentage>\d{1,3}(?:\.\d{1,2})?)%\)\s+CN:(?P<connections>\d+)\s+DL:(?P<speed>[\d\.]+(?:[KMGT]?i?)B)(?:\s+ETA:(?P<eta>[\dsmh:]+))?',
+        re.IGNORECASE
+    )
 
     @classmethod
     def detect_phase(cls, progress_info: str) -> str:
@@ -66,43 +70,36 @@ class ProgressParser:
         result = {
             'phase': cls.detect_phase(line),
             'progress': None,  # Percentage (0-100)
-            'speed': None,     # In MB/s or KB/s
-            'eta': None,       # In seconds
+            'speed': None,     # In MiB/s (float)
+            'eta': None,       # In seconds (int)
             'filename': None,  # Filename being processed
-            'connections': None # For aria2c
+            'connections': None # For aria2c (int)
         }
 
         info_str = str(line)
         
         if result['phase'] == "DOWNLOADING_ARIA2C":
-            # Example: CN:X DL:Y ETA:Z
             aria2c_match = cls._ARIA2C_PATTERN.search(info_str)
             if aria2c_match:
-                result['connections'] = int(aria2c_match.group(1))
-                speed_str = aria2c_match.group(2)
-                # Convert speed to float, handling units (MiB/s, KiB/s, GiB/s)
-                unit_match = re.search(r'([\d.]+)\s*(M|K|G)iB/s', info_str, re.IGNORECASE)
-                if unit_match:
-                    value = float(unit_match.group(1))
-                    unit = unit_match.group(2).upper()
-                    if unit == 'G':
-                        result['speed'] = value * 1024 # Convert GiB/s to MiB/s for consistency
-                    elif unit == 'K':
-                        result['speed'] = value / 1024 # Convert KiB/s to MiB/s
-                    else: # M
-                        result['speed'] = value
-                
-            eta_match = re.search(r'ETA:\s*(\d+)s', info_str) # aria2c typically uses "s"
-            if eta_match:
-                result['eta'] = int(eta_match.group(1))
-            
-            # aria2c output as per conventions does not directly provide percentage for overall progress.
-            # We'll rely on yt-dlp's overall progress if it wraps aria2c.
-            # For now, if an aria2c line is detected, we can assume some progress is happening.
-            # If `aria2c` line is active, ensure progress doesn't drop to 0.
-            # A common strategy is to report a small non-zero progress if no specific percent is found.
-            # However, the direct request is to parse DL/CN, not to invent progress.
-            # The UI should handle `None` for progress for aria2c lines by retaining last known progress.
+                # Extract percentage
+                percentage_str = aria2c_match.group('percentage')
+                if percentage_str:
+                    result['progress'] = float(percentage_str)
+
+                # Extract connections
+                connections_str = aria2c_match.group('connections')
+                if connections_str:
+                    result['connections'] = int(connections_str)
+
+                # Extract speed (DL:XMiB, where XMiB is the speed, no /s in the log itself)
+                speed_str = aria2c_match.group('speed')
+                if speed_str:
+                    result['speed'] = cls._convert_speed_to_mbps(speed_str)
+
+                # Extract ETA
+                eta_str = aria2c_match.group('eta')
+                if eta_str:
+                    result['eta'] = cls._convert_eta_to_seconds(eta_str)
 
         elif result['phase'] in ["DOWNLOADING_YT_DLP", "MERGING"]:
             # Extract progress percentage if present (yt-dlp format)
@@ -110,11 +107,16 @@ class ProgressParser:
             if progress_match:
                 result['progress'] = int(progress_match.group(1))
 
-            # Extract speed if present (yt-dlp format)
-            speed_match = re.search(r'(\d+\.\d+)\s*(?:MB|KB)/s', info_str)
+            # Extract speed if present (yt-dlp format) - convert to MiB/s
+            speed_match = re.search(r'(\d+\.\d+)\s*(?:M|K)B/s', info_str) # Adjusted to handle KB/s
             if speed_match:
-                result['speed'] = float(speed_match.group(1))
-
+                value = float(speed_match.group(1))
+                unit = speed_match.group(0)[-4:-2] # Get 'MB' or 'KB'
+                if unit == 'KB':
+                    result['speed'] = value / 1024 # Convert KB/s to MiB/s
+                else: # MB/s
+                    result['speed'] = value # yt-dlp reports in MB/s, keep as MiB/s roughly
+            
             # Extract ETA if present (yt-dlp format)
             eta_match = re.search(r'ETA:\s*(\d+)', info_str)
             if eta_match:
@@ -144,3 +146,63 @@ class ProgressParser:
         """Extract ETA from progress info, handling both yt-dlp and aria2c."""
         parsed = cls.parse_progress_line(progress_info)
         return int(parsed['eta']) if parsed['eta'] is not None else None
+
+    @staticmethod
+    def _convert_speed_to_mbps(speed_str: str) -> Optional[float]:
+        """Converts a speed string (e.g., "1.2MiB/s", "10KB/s", "21MiB") to a float in MiB/s."""
+        if not speed_str:
+            return None
+        # Modified regex to make "/s" optional
+        match = re.match(r'([\d\.]+)([KMGT]?i?)B(?:/s)?', speed_str, re.IGNORECASE)
+        if not match:
+            return None
+        value = float(match.group(1))
+        unit = match.group(2).upper() # 'K', 'M', 'G', 'T' or empty for bytes
+        
+        if unit == 'K' or unit == 'KI':
+            return value / 1024 # Convert KiB/s to MiB/s
+        elif unit == 'M' or unit == 'MI':
+            return value
+        elif unit == 'G' or unit == 'GI':
+            return value * 1024
+        elif unit == 'T' or unit == 'TI':
+            return value * 1024 * 1024
+        elif not unit: # Bytes/s
+            return value / (1024 * 1024)
+        return value
+
+    @staticmethod
+    def _convert_eta_to_seconds(eta_str: str) -> Optional[int]:
+        """Converts an ETA string (e.g., "00:00", "1m", "0s") to total seconds."""
+        if not eta_str:
+            return None
+        
+        total_seconds = 0
+        
+        # Handle HH:MM:SS or MM:SS format
+        if ':' in eta_str:
+            parts = eta_str.split(':')
+            try:
+                if len(parts) == 2: # MM:SS
+                    total_seconds += int(parts[0]) * 60
+                    total_seconds += int(parts[1])
+                elif len(parts) == 3: # HH:MM:SS
+                    total_seconds += int(parts[0]) * 3600
+                    total_seconds += int(parts[1]) * 60
+                    total_seconds += int(parts[2])
+            except ValueError:
+                return None # Invalid format
+        else: # Handle formats like "1h23m45s", "1m", "0s"
+            hours_match = re.search(r'(\d+)h', eta_str)
+            if hours_match:
+                total_seconds += int(hours_match.group(1)) * 3600
+            
+            minutes_match = re.search(r'(\d+)m', eta_str)
+            if minutes_match:
+                total_seconds += int(minutes_match.group(1)) * 60
+            
+            seconds_match = re.search(r'(\d+)s', eta_str)
+            if seconds_match:
+                total_seconds += int(seconds_match.group(1))
+        
+        return total_seconds
