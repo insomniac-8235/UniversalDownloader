@@ -38,7 +38,7 @@ class UIController:
             self.root, 
             corner_radius=0,
             fg_color=self.theme["APP_BG"],
-            border_width=0
+            # border_width=0
         )
         self.outer_frame.pack(fill="both", expand=True)
         
@@ -46,7 +46,7 @@ class UIController:
         self.content_frame = ctk.CTkFrame(
             self.outer_frame, 
             fg_color=self.theme["APP_BG"],
-            border_width=0,
+            # border_width=0,
         )
         self.content_frame.pack(pady=(0, 0), padx=20, fill="both", expand=False)
         self.content_frame.grid_columnconfigure(0, weight=1)
@@ -55,7 +55,7 @@ class UIController:
         self.url_label = ctk.CTkLabel(
             self.content_frame,
             text="Media URL",
-            fg_color=self.theme["APP_BG"],
+            # fg_color=self.theme["APP_BG"],
             font=self.main_font,
             text_color=self.theme["TEXT_MAIN"]
         )
@@ -63,8 +63,8 @@ class UIController:
         
         self.url_container = ctk.CTkFrame(
             self.content_frame,
-            fg_color=self.theme["APP_BG"],
-            border_width=0,
+            #fg_color=self.theme["APP_BG"],
+            # border_width=0,
         )
         self.url_container.grid(row=1, column=0, columnspan=2, sticky="we", pady=(0, 20))
         self.url_container.grid_columnconfigure(0, weight=1)
@@ -77,7 +77,8 @@ class UIController:
             corner_radius=18,
             font=self.input_font,
             bg_color=self.theme["APP_BG"],
-            text_color=self.theme["TEXT_MAIN"],
+            fg_color=self.theme["ENTRY_BG"],
+            text_color=self.theme["TEXT_ENTRY"],
             border_width=1,
         )
         self.url_entry.grid(row=0, column=0, sticky="we")
@@ -90,8 +91,8 @@ class UIController:
             corner_radius=18,
             font=self.button_font,
             bg_color=self.theme["ENTRY_BG"],
-            fg_color=self.theme["BTN_ACTION"],
-            text_color=self.theme["TEXT_ACTION"],
+            fg_color=self.theme["BTN_ACTION"],  
+            text_color=self.theme["TEXT_ACTION_BTN"],
             hover_color=self.theme["BTN_HOVER"],
             command=self.paste_url_from_clipboard
         )
@@ -110,7 +111,7 @@ class UIController:
             self.content_frame,
             fg_color=self.theme["APP_BG"],
             border_width=0,
-            border_color=self.theme["BORDER_DEFAULT"]
+            # border_color=self.theme["BORDER_DEFAULT"]
         )
         self.folder_frame.grid(row=3, column=0, columnspan=2, sticky="we", pady=(0, 20))
         self.folder_frame.grid_columnconfigure(0, weight=1)
@@ -122,9 +123,9 @@ class UIController:
             height=55,
             corner_radius=18,
             font=self.input_font,
-            bg_color=self.theme["APP_BG"],
             text_color=self.theme["TEXT_GHOST"],
             border_width=1,
+            fg_color=self.theme["ENTRY_BG"],
             border_color=self.theme["BORDER_DEFAULT"]
         )
         self.folder_entry.grid(row=0, column=0, sticky="we")
@@ -138,7 +139,7 @@ class UIController:
             font=self.button_font,
             bg_color=self.theme["ENTRY_BG"],
             fg_color=self.theme["BTN_ACTION"],
-            text_color=self.theme["TEXT_ACTION"],
+            text_color=self.theme["TEXT_ACTION_BTN"],
             hover_color=self.theme["BTN_HOVER"],
             command=self.select_folder
         )
@@ -159,11 +160,11 @@ class UIController:
             switch_width=40,
             switch_height=20,
             fg_color=self.theme["ENTRY_BG"],
-            progress_color=self.theme["BTN_ACTION"],
-            button_color="#808080",
+            progress_color=self.theme["PROG_FILL"],
+            button_color=self.theme["SWITCH_BTN"],
             button_hover_color=self.theme["BTN_HOVER"],
             border_width=2,
-            border_color=self.theme["BORDER_DEFAULT"]
+            # border_color=self.theme["BORDER_DEFAULT"]
         )
         self.audio_switch.grid(row=4, column=0, sticky="w", padx=(88, 20), pady=(0, 20))
         
@@ -266,7 +267,7 @@ class UIController:
                     text="Download Now",
                     fg_color=self.theme["BTN_ACTION"],
                     hover_color=self.theme["BTN_HOVER"],
-                    text_color=self.theme["TEXT_ACTION"]
+                    text_color=self.theme["TEXT_ACTION_BTN"]
                 )
         elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
             self.download_btn.configure(
@@ -291,9 +292,9 @@ class UIController:
     
     def select_folder(self):
         if folder := filedialog.askdirectory():
-            self.folder_entry.delete(0, "end")
+            self.folder_entry.delete(0, "end")  
             self.folder_entry.insert(0, folder)
-            self.folder_entry.configure(text_color=self.theme["TEXT_MAIN"])
+            self.folder_entry.configure(text_color=self.theme["TEXT_ENTRY"])
             self.validate_inputs()
         
     def paste_url_from_clipboard(self):
