@@ -312,3 +312,31 @@ class UIController:
                 self._progress_callback(progress)
             except Exception as e:
                 print(f"Progress callback error: {e}")
+
+    def validate_inputs(self):
+        """Validate inputs and enable/disable download button based on validity"""
+        url = self.url_entry.get().strip()
+        folder = self.folder_entry.get().strip()
+
+        if url and folder:
+            self.download_btn.configure(
+                state="normal",
+                text="Download",
+                fg_color=self.theme["BTN_ACTION"],
+                hover_color=self.theme["BTN_HOVER"],
+                text_color=self.theme["TEXT_ACTION_BTN"]
+            )
+        else:
+            self.download_btn.configure(
+                state="disabled",
+                text="Enter a URL & Location",
+                fg_color=self.theme["BTN_DISABLED"],
+                text_color_disabled=self.theme["TEXT_DISABLED"]
+            )
+
+    def _debounced_validate_inputs(self, event):
+        """Debounced input validation to respect 10Hz limit"""
+        if self._debounce_timer is not None:
+            self.root.after_cancel(self._debounce_timer)
+        
+        self._debounce_timer = self.root.after(100, self.validate_inputs)
