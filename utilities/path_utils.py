@@ -16,7 +16,7 @@ class PathCache:
         
         if self._deno_path is not None:
             return self._deno_path
-        
+
         # 0. Portable‐app root – look in `deno_bin/` relative to this file
         for root_dir in (
             # If the code is frozen (PyInstaller) – use the temporary folder
@@ -57,9 +57,7 @@ class PathCache:
             self._deno_path = env_path
             return self._deno_path
 
-        # 4. Normal PATH lookup
-        p = shutil.which("deno")
-        if p:
+        if p := shutil.which("deno"):
             self._deno_path = p
             return self._deno_path
 
@@ -77,7 +75,7 @@ class PathCache:
         
         if self._ffmpeg_path is not None:
             return self._ffmpeg_path
-        
+
         # 0. Portable‐app root – look in `ffmpeg_bin/` relative to this file
         for root_dir in (
             getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__))),
@@ -115,9 +113,7 @@ class PathCache:
             self._ffmpeg_path = env_path
             return self._ffmpeg_path
 
-        # 4. Normal PATH lookup
-        p = shutil.which("ffmpeg")
-        if p:
+        if p := shutil.which("ffmpeg"):
             self._ffmpeg_path = p
             return self._ffmpeg_path
 
@@ -133,8 +129,7 @@ class PathCache:
     def get_aria2c_path(self) -> Optional[str]:
         """Return the absolute path to the aria2c binary, or None if not found."""
         if self._aria2c_path is None:
-            path = shutil.which("aria2c")
-            if path:
+            if path := shutil.which("aria2c"):
                 self._aria2c_path = path
         return self._aria2c_path
 

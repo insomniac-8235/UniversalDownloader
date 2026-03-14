@@ -45,7 +45,7 @@ class UniversalDownloader(ctk.CTk):
         
         # Initialize UI controller BEFORE ThreadPoolManager to pass it
         self.controller = UIController(self, None) # Pass self, but None for queue_manager initially
-                                                  # We'll set the queue_manager reference after it's created
+        # We'll set the queue_manager reference after it's created
         
         # Initialize queue manager with shared worker and the controller instance
         # MODIFIED: Pass self.controller to ThreadPoolManager
