@@ -1,10 +1,31 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 import os
 import sys
 from typing import Dict, Any 
 from utilities.theme import THEME
 # No need to import ThreadPoolManager here specifically, type hints handle it
+
+class ThemedDialog(ctk.CTkToplevel):
+    def __init__(self, master, title, message):
+        super().__init__(master)
+        self.title(title)
+        self.geometry("300x150")
+        self.attributes("-topmost", True)
+        self.resizable(False, False)
+        
+        # Center the dialog relative to the main window
+        self.update_idletasks()
+        x = master.winfo_x() + (master.winfo_width() // 2) - 150
+        y = master.winfo_y() + (master.winfo_height() // 2) - 75
+        self.geometry(f"+{x}+{y}")
+
+        self.label = ctk.CTkLabel(self, text=message, wraplength=250)
+        self.label.pack(pady=20, padx=20)
+        
+        self.btn = ctk.CTkButton(self, text="OK", command=self.destroy)
+        self.btn.pack(pady=10)
+        self.grab_set()
 
 class UIController:
     # MODIFIED: queue_manager can be None initially to handle circular dependency
@@ -254,7 +275,7 @@ class UIController:
 
     def on_invalid_url(self, error_msg: str):
         """Handle invalid URL errors"""
-        self.root.after(0, lambda: messagebox.showerror("Invalid URL", f"Invalid URL provided:\n{error_msg}"))
+        self.root.after(0, lambda: ThemedDialog(self.root, "Invalid URL", f"Invalid URL provided:\n{error_msg}"))
 
     def get_build_info(self):
         """Combines Version Number and Git Commit for the UI."""
@@ -320,7 +341,7 @@ class UIController:
         ))
         
         # Show completion popup after a short delay
-        self.root.after(100, lambda: messagebox.showinfo("Download Complete", f"Download completed successfully!\nLocation: {folder}"))
+        self.root.after(100, lambda: ThemedDialog(self.root, "Download Complete", f"Download completed successfully!\nLocation: {folder}"))
         
     def on_download_error(self, error_msg):
         """Handle download errors"""
@@ -337,7 +358,7 @@ class UIController:
         ))
         
         # Show error popup
-        self.root.after(100, lambda: messagebox.showerror("Download Error", f"Download failed:\n{error_msg}"))
+        self.root.after(100, lambda: ThemedDialog(self.root, "Download Error", f"Download failed:\n{error_msg}"))
 
     def on_progress_update(self, d: Dict[str, Any]): 
         """Handle progress updates from the download worker to control indeterminate bar"""
