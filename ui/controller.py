@@ -235,8 +235,26 @@ class UIController:
         self.folder_entry.bind("<KeyRelease>", self._debounced_validate_inputs)
         
         # Download Button - batch update on state change
-        # ADDED: Ensure self.queue is not None before calling it
-        self.download_btn.configure(command=lambda: self.queue(self.url_entry.get().strip(), self.folder_entry.get().strip(), self.audio_switch.get()) if self.queue else None)
+        # UPDATE: Change the download_btn command to call start_download
+        self.download_btn.configure(command=self.start_download)
+
+    def start_download(self):
+        """Validate inputs and trigger the queue if valid"""
+        url = self.url_entry.get().strip()
+        folder = self.folder_entry.get().strip()
+        
+        # Basic URL validation
+        if not url.startswith("http"):
+            self.on_invalid_url("URL must start with http:// or https://")
+            return
+            
+        # If valid, proceed to queue
+        if self.queue:
+            self.queue(url, folder, self.audio_switch.get())
+
+    def on_invalid_url(self, error_msg: str):
+        """Handle invalid URL errors"""
+        self.root.after(0, lambda: messagebox.showerror("Invalid URL", f"Invalid URL provided:\n{error_msg}"))
 
     def get_build_info(self):
         """Combines Version Number and Git Commit for the UI."""
