@@ -38,7 +38,7 @@ class UniversalDownloader(ctk.CTk):
         # Load Metadata (Single Source of Truth from GitHub Action)
         self.version_info = self._load_metadata()
         
-        self.title(f"Universal Downloader - {self.version_info}")
+        self.title(f"Universal Downloader")
         self.geometry("500x400")
         self.resizable(False, False)
         self.configure(bg=THEME["APP_BG"])

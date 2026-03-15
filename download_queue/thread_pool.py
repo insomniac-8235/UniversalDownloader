@@ -1,6 +1,5 @@
 import threading
 import time
-import os
 import platform
 import subprocess
 from queue import Empty
@@ -41,17 +40,27 @@ class ThreadPoolManager:
             )
             t.start()
             self._thread_pool.append(t)
+    def enqueue(self, url, folder, is_audio):
+            """Packages UI data into a task dict and sends it to the queue."""
+            task = {
+                'url': url,
+                'folder': folder,
+                'is_audio': is_audio
+            }
+            self.logger.info(f"Task prepared for {url}")
+            # This calls the enqueue method on your DownloadQueue instance
+            self.queue.enqueue(task)
 
     def _notify_completion(self, task):
         """Handles post-download logic and UI notification."""
-        self.logger.info(f"✅ Task Completed: {task}")
+        self.logger.info(f"Task Completed: {task}")
         if self.controller:
             # Add logic here to update your UI via the controller
             pass
 
     def _notify_error(self, task, error_msg):
         """Handles failure logic and UI notification."""
-        self.logger.error(f"❌ Task Failed: {task} | Error: {error_msg}")
+        self.logger.error(f"Task Failed: {task} | Error: {error_msg}")
         if self.controller:
             # Add logic here to show error in UI via the controller
             pass
@@ -60,7 +69,7 @@ class ThreadPoolManager:
     def stop(self):
         """Graceful shutdown with Cross-Platform Cleanup"""
         self._shutdown_event.set()
-        self.logger.info("🛑 Initiating universal shutdown...")
+        self.logger.info("Initiating universal shutdown...")
 
         # 1. Kill subprocesses based on OS (The Enforcer Layer)
         self._kill_binaries()

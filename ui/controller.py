@@ -271,7 +271,8 @@ class UIController:
             
         # If valid, proceed to queue
         if self.queue:
-            self.queue(url, folder, self.audio_switch.get())
+            # This calls the new method we just added
+            self.queue.enqueue(url, folder, self.audio_switch.get())
 
     def on_invalid_url(self, error_msg: str):
         """Handle invalid URL errors"""
