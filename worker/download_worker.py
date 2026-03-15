@@ -4,7 +4,6 @@ from typing import Optional, Dict, Any, Callable
 import os
 from utilities.logger import MyLogger
 from utilities.path_utils import get_deno_path, get_ffmpeg_path, get_aria2c_path
-# REMOVED: from worker.progress_parser import ProgressParser (no longer needed for UI bar)
 
 class DownloadWorker:
     def __init__(self, logger=None):
@@ -32,58 +31,10 @@ class DownloadWorker:
     def download(self, url: str, folder: str, is_audio: bool) -> bool:
         """Handle the actual media download process"""
         try:
-            # REMOVED: _total_bytes is no longer needed for indeterminate progress
-            # self._total_bytes = 0 
-            
-            # Ensure ffmpeg is properly configured
-            ffmpeg_path = get_ffmpeg_path()
-            if not ffmpeg_path:
-                raise FileNotFoundError("FFmpeg not found in PATH")
-            
-            # Make sure we have a Deno binary before proceeding
-            if not self._deno_path:
-                raise FileNotFoundError(
-                    "Deno binary not found. Please install Deno or set DENO_PATH."
-                )
-
-            ydl_opts = {
-                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
-                'restrictfilenames': True,
-                'noplaylist': True,
-                'ffmpeg_location': ffmpeg_path,
-                'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
-                'logger': self.logger,
-                'progress_hooks': [self],
-                
-                # Correctly-structured js_runtimes:
-                #   runtime name → config dict (executable_path + options list)
-                'js_runtimes': {
-                    'deno': {
-                        'executable_path': self._deno_path,
-                        'options': []          # ← leave empty unless extra flags are needed
-                    }
-                },
-            }
-            
-            if self._aria2c_path:
-                self.logger.info("Using aria2c for multi-threaded downloading.")
-                ydl_opts['external_downloader'] = self._aria2c_path
-                ydl_opts['external_downloader_args'] = [
-                    '--summary-interval=1',  # Force progress updates every second
-                    '-x', '16',              # Max 16 connections per server
-                    '-s', '16',              # Split file into 16 parts
-                    '-k', '1M',              # Minimum split size of 1MB
-                    '-c'                     # ADDED: Ensure continue/resume functionality per CONVENTIONS.md
-                ]
-            
-            with YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-                
-            return True
-            
+            return self._extracted_from_download_8(is_audio, folder, url)
         except Exception as e:
             error_msg = str(e)
-            
+
             # Handle specific errors per CONVENTIONS.md
             if "Sign-in required" in error_msg or "sign in" in error_msg.lower():
                 self.logger.error("Sign-in required for this URL")
@@ -91,8 +42,59 @@ class DownloadWorker:
                 self.logger.error("Codec not found. Please install ffmpeg.")
             else:
                 self.logger.error(f"Download failed: {error_msg}")
-            
+
             raise
+
+    # TODO Rename this here and in `download`
+    def _extracted_from_download_8(self, is_audio, folder, url):
+        # REMOVED: _total_bytes is no longer needed for indeterminate progress
+        # self._total_bytes = 0 
+
+        # Ensure ffmpeg is properly configured
+        ffmpeg_path = get_ffmpeg_path()
+        if not ffmpeg_path:
+            raise FileNotFoundError("FFmpeg not found in PATH")
+
+        # Make sure we have a Deno binary before proceeding
+        if not self._deno_path:
+            raise FileNotFoundError(
+                "Deno binary not found. Please install Deno or set DENO_PATH."
+            )
+
+        ydl_opts = {
+            'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+            'restrictfilenames': True,
+            'noplaylist': True,
+            'ffmpeg_location': ffmpeg_path,
+            'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
+            'logger': self.logger,
+            'progress_hooks': [self],
+
+            # Correctly-structured js_runtimes:
+            #   runtime name → config dict (executable_path + options list)
+            'js_runtimes': {
+                'deno': {
+                    'executable_path': self._deno_path,
+                    'options': []          # ← leave empty unless extra flags are needed
+                }
+            },
+        }
+
+        if self._aria2c_path:
+            self.logger.info("Using aria2c for multi-threaded downloading.")
+            ydl_opts['external_downloader'] = self._aria2c_path
+            ydl_opts['external_downloader_args'] = [
+                '--summary-interval=1',  # Force progress updates every second
+                '-x', '16',              # Max 16 connections per server
+                '-s', '16',              # Split file into 16 parts
+                '-k', '1M',              # Minimum split size of 1MB
+                '-c'                     # ADDED: Ensure continue/resume functionality per CONVENTIONS.md
+            ]
+
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        return True
             
     def download_progress_hook(self, d: Dict[str, Any]) -> None:
         """Progress hook for yt-dlp to update download progress"""

@@ -22,10 +22,8 @@ class DownloadQueue:
             url = task['url']
             folder = task['folder']
             is_audio = task['is_audio']
-            
-            # Use the worker to download the media
-            success = self.worker.download(url, folder, is_audio)
-            return success
+
+            return self.worker.download(url, folder, is_audio)
         except KeyError as e:
             # Log missing key in task
             self.worker.logger.error(f"Task missing required key: {e}", exc_info=True)
