@@ -4,7 +4,6 @@ import os
 import sys
 from typing import Dict, Any 
 from utils.theme import THEME
-# No need to import ThreadPoolManager here specifically, type hints handle it
 
 class ThemedDialog(ctk.CTkToplevel):
     def __init__(self, master, title, message):
@@ -341,19 +340,22 @@ class UIController:
     def on_download_complete(self, url, folder, is_audio):
         """Handle download completion and show popup"""
         # Ensure UI updates are on the main thread
-        self.root.after(0, lambda: self.progress_bar.stop()) 
-        self.root.after(0, lambda: self.progress_bar.set(0)) 
+        self.view.after(0, lambda: self.progress_bar.stop())
+        self.view.after(0, lambda: self.progress_bar.set(0)) 
         
-        self.root.after(0, lambda: self.download_btn.configure(
-            state="disabled",
-            text="Download Complete",
-            fg_color=self.theme["BTN_DISABLED"],
-            hover_color=self.theme["BTN_HOVER"],
-            text_color=self.theme["TEXT_ACTION_BTN"]
+        # Re-enable the button or set it to "Ready"
+        self.view.after(0, lambda: self.download_btn.configure(
+            state="normal", # Changed from 'disabled' so you can download again!
+            text="Download Another",
+            fg_color=self.theme["BTN_NORMAL"]
         ))
         
-        # Show completion popup after a short delay
-        self.root.after(100, lambda: ThemedDialog(self.root, "Download Complete", f"Download completed successfully!\nLocation: {folder}"))
+        # Show your custom ThemedDialog
+        self.view.after(100, lambda: ThemedDialog(
+            self.view, 
+            "Download Complete", 
+            f"Successfully saved to:\n{folder}"
+        ))
         
     def on_download_error(self, error_msg):
         """Handle download errors"""
