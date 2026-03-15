@@ -1,200 +1,148 @@
-name: Build & Release (Windows and macOS)
+name: Build & Release (Official)
 
 on:
   push:
     tags:
-      - "v*"  # ONLY trigger on tags, never on a regular branch push
+      - "v*"  # Triggers only on version tags like v1.0.0
 
 env:
-  APP_NAME: UniversalDownloader
-  VERSION: ${{ github.ref_name }}  # Git tag version
+  APP_NAME: "Universal Downloader"
+  VERSION: ${{ github.ref_name }} # The tag itself (e.g., v1.0.0)
+  PYTHON_VERSION: "3.14.3"
 
 jobs:
-
   build-windows:
     name: Build Windows
     runs-on: windows-latest
-    env:
-      VERSION: ${{ github.ref_name }}
-    outputs:
-      artifact_path: ${{ steps.rename.outputs.artifact }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.3.0
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Generate Build Metadata
+        shell: bash
+        run: |
+          mkdir -p assets
+          echo "${{ env.VERSION }}" > assets/version.txt
+          echo "${GITHUB_SHA:0:7}" > assets/commit.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller "yt-dlp[default]"
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
 
-      - name: Install FFmpeg
-        run: choco install ffmpeg -y
-
-      - name: Copy FFmpeg binaries
+      - name: Install Binaries (Choco)
         shell: pwsh
         run: |
-          $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
-          Copy-Item $ff ffmpeg.exe
+          choco install deno ffmpeg aria2 -y
+          refreshenv
+          mkdir bin
+          Copy-Item "C:\ProgramData\chocolatey\bin\deno.exe" "bin\deno.exe"
+          Copy-Item "C:\ProgramData\chocolatey\bin\ffmpeg.exe" "bin\ffmpeg.exe"
+          Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" "bin\aria2c.exe"
 
-      - name: Generate UI Commit File
-        shell: bash
-        run: |
-          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
-
-      - name: Build executable with version info
+      - name: Build Executable
         shell: pwsh
         run: |
           python -m PyInstaller --clean --noconsole --onefile `
-            --collect-all customtkinter `
-            --collect-all yt_dlp `
+            --collect-all customtkinter --collect-all yt_dlp `
             --add-data "assets;assets" `
-            --add-binary "ffmpeg.exe;." `
-            --icon "assets/icon.ico" `
-            --name "UniversalDownloader_win64" `
-            main.py
+            --add-binary "bin/ffmpeg.exe;bin" `
+            --add-binary "bin/deno.exe;bin" `
+            --add-binary "bin/aria2c.exe;bin" `
+            --icon "assets/icon.ico" --name "${{ env.APP_NAME }}_win64" main.py
 
-      - name: Rename Windows artifact with version
-        id: rename
+      - name: Rename for Release
         shell: pwsh
         run: |
-          $newName = "${{ env.APP_NAME }}_win64_${{ env.VERSION }}.exe"
-          mv "dist/UniversalDownloader_win64.exe" "dist/$newName"
-          echo "artifact=dist/$newName" >> $env:GITHUB_OUTPUT
+          $NewName = "${{ env.APP_NAME }}_${{ env.VERSION }}_win64.exe"
+          mv "dist/${{ env.APP_NAME }}_win64.exe" "dist/$NewName"
+          echo "FINAL_NAME=$NewName" >> $env:GITHUB_ENV
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a # v6.0.0
         with:
           name: windows-bin
-          path: ${{ steps.rename.outputs.artifact }}
-
+          path: dist/${{ env.FINAL_NAME }}
 
   build-macos:
     name: Build macOS
     runs-on: macos-latest
-    outputs:
-      artifact_path: ${{ steps.rename.outputs.artifact }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
+      - name: Generate Build Metadata
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          mkdir -p assets
+          echo "${{ env.VERSION }}" > assets/version.txt
+          echo "${GITHUB_SHA:0:7}" > assets/commit.txt
 
-      - name: Install FFmpeg
+      - name: Install Binaries (Brew)
         run: |
-          brew install ffmpeg
-
-      - name: Copy FFmpeg binary
-        run: |
-          FF=$(which ffmpeg)
-          echo "FFmpeg path: $FF"
-          cp "$FF" ./ffmpeg
-          chmod +x ffmpeg
-          ls -lah ffmpeg
-
-      - name: Generate UI Commit File
-        shell: bash
-        run: |
-          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
-
-      - name: Verify FFmpeg
-        run: |
-          ./ffmpeg -version
+          brew install deno ffmpeg aria2
+          mkdir -p bin
+          cp $(which ffmpeg) bin/ffmpeg
+          cp $(which deno) bin/deno
+          cp $(which aria2c) bin/aria2c
+          chmod +x bin/*
 
       - name: Build macOS app
         run: |
           python -m PyInstaller --clean --windowed \
-          --collect-all customtkinter \
-          --collect-all yt_dlp \
-          --add-data "assets:assets" \
-          --add-binary "ffmpeg:." \
-          --icon "assets/icon.icns" \
-          --name "UniversalDownloader_macOS" \
-          main.py
+            --collect-all customtkinter --collect-all yt_dlp \
+            --add-data "assets:assets" \
+            --add-binary "bin/ffmpeg:bin" \
+            --add-binary "bin/deno:bin" \
+            --add-binary "bin/aria2c:bin" \
+            --icon "assets/icon.icns" --name "${{ env.APP_NAME }}_macOS" main.py
 
-      - name: Create DMG with Applications Shortcut
-        id: create_dmg_beta
+      - name: Create DMG
         run: |
           mkdir -p dist/dmg_staging
-
-          # Use a wildcard (*.app) to find the folder regardless of the name
-          cp -R dist/*.app dist/dmg_staging/
-
-          # Create the shortcut
+          cp -R "dist/${{ env.APP_NAME }}_macOS.app" dist/dmg_staging/
           ln -s /Applications dist/dmg_staging/Applications
+          hdiutil create -volname "${{ env.APP_NAME }} ${{ env.VERSION }}" -srcfolder dist/dmg_staging -ov -format UDZO "Release.dmg"
 
-          # Create the DMG
-          hdiutil create -volname "${{ env.APP_NAME }} Beta" \
-            -srcfolder dist/dmg_staging \
-            -ov -format UDZO \
-            "${{ env.APP_NAME }}_macOS_beta.dmg"
-
-          echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
-
-      - name: Rename macOS artifact with version
-        id: rename
+      - name: Rename DMG for Release
         run: |
-          # Remove "beta" from the filename if it exists
-          if [[ "${{ env.APP_NAME }}_macOS_beta.dmg" == *"beta"* ]]; then
-            base_name="${{ env.APP_NAME }}_macOS"
-          else
-            base_name="${{ env.APP_NAME }}_macOS_beta"
-          fi
-
-          # Append the version number to the base name
-          new_name="${base_name}_${{ env.VERSION }}.dmg"
-          mv "${{ env.APP_NAME }}_macOS_beta.dmg" "$new_name"
-          echo "artifact=$new_name" >> $GITHUB_OUTPUT
+          CLEAN_NAME="${{ env.APP_NAME }}_${{ env.VERSION }}_macOS.dmg"
+          mv "Release.dmg" "$CLEAN_NAME"
+          echo "FINAL_NAME_MAC=$CLEAN_NAME" >> $GITHUB_ENV
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a
         with:
           name: macos-bin
-          path: ${{ steps.rename.outputs.artifact }}
+          path: ${{ env.FINAL_NAME_MAC }}
 
   release:
-    name: Create Release
+    name: Create GitHub Release
     needs: [ build-windows, build-macos ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
       - name: Download all artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@fa0b912 # v4.4.1
         with:
-          path: release_assets  # This puts everything in one folder
-
-      - name: Create Versions File
-        run: |
-          echo "Version: ${{ env.VERSION }}" > versions_${{ env.VERSION }}.txt
-          echo "Commit: $(git rev-parse --short HEAD)" >> versions_${{ env.VERSION }}.txt
+          path: release_assets
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         with:
-          name: Universal Media Downloader ${{ github.ref_name }}
+          name: ${{ env.APP_NAME }} ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             release_assets/windows-bin/*
             release_assets/macos-bin/*
-            versions_${{ env.VERSION }}.txt

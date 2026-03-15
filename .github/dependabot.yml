@@ -1,0 +1,15 @@
+version: 2
+updates:
+# 1. Keep Python dependencies (yt-dlp, customtkinter, etc.) up to date
+- package-ecosystem: "pip"
+  directory: "/" # Look for requirements.txt in the root
+  schedule:
+    interval: "daily"
+  open-pull-requests-limit: 5
+
+# 2. Keep GitHub Actions up to date (updates the pinned SHAs!)
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    interval: "weekly"
+  open-pull-requests-limit: 5

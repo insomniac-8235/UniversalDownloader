@@ -3,7 +3,7 @@ from tkinter import filedialog
 import os
 import sys
 from typing import Dict, Any 
-from utilities.theme import THEME
+from utils.theme import THEME
 # No need to import ThreadPoolManager here specifically, type hints handle it
 
 class ThemedDialog(ctk.CTkToplevel):
@@ -278,19 +278,30 @@ class UIController:
         self.root.after(0, lambda: ThemedDialog(self.root, "Invalid URL", f"Invalid URL provided:\n{error_msg}"))
 
     def get_build_info(self):
-        """Combines Version Number and Git Commit for the UI."""
-        version = "v0.2.1"  # Manually update this here for each release
+        """
+        Automatically retrieves Version and Commit SHA from the baked-in 
+        assets folder, ensuring the UI always matches the build metadata.
+        """
+        # Determine the base directory (Bundle vs. Local Dev)
+        if hasattr(sys, '_MEIPASS'):
+            base_path = sys._MEIPASS
+        else:
+            # Assuming this script is in ui/ and assets/ is in project root
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        v_path = os.path.join(base_path, 'assets', 'version.txt')
+        c_path = os.path.join(base_path, 'assets', 'commit.txt')
+
         try:
-            # Path to assets/ is relative to the project root, not the ui/ directory.
-            # We go up one level from this file's directory to get the project root.
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            commit_file_path = os.path.join(project_root, 'assets', 'commit.txt')
-            with open(commit_file_path, "r") as f:
-                commit = f.read().strip()
+            with open(v_path, "r") as v_file, open(c_path, "r") as c_file:
+                version = v_file.read().strip()
+                commit = c_file.read().strip()
             return f"{version} ({commit})"
-        except Exception:
-            # Fallback for local development
-            return f"{version} (Dev)"
+        except FileNotFoundError:
+
+            return "v0.0.0-dev (local)"
+        except Exception as e:
+            return f"Error loading version: {str(e)}"
 
     # REMOVED: set_progress_callback is no longer needed in UIController
     # def set_progress_callback(self, callback):

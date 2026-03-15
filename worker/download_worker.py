@@ -2,8 +2,8 @@ import contextlib
 from yt_dlp import YoutubeDL
 from typing import Optional, Dict, Any, Callable
 import os
-from utilities.logger import MyLogger
-from utilities.path_utils import get_deno_path, get_ffmpeg_path, get_aria2c_path
+from utils.logger import MyLogger
+from utils.paths import get_deno_path, get_ffmpeg_path, get_aria2c_path
 
 class DownloadWorker:
     def __init__(self, logger=None):

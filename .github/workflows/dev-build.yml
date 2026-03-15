@@ -1,11 +1,12 @@
 name: Dev Builds
 
 on:
-  workflow_dispatch: # This is the ONLY trigger now
+  workflow_dispatch:   # Manual trigger
 
 env:
-  APP_NAME: UniversalDownloader
-  VERSION: beta # Fixed version string for dev builds
+  APP_NAME: "Universal Downloader"
+  VERSION: "v0.2.1"
+  PYTHON_VERSION: "3.14.3"
 
 jobs:
   build-windows:
@@ -13,138 +14,129 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.3.0
         with:
-          python-version: "3.14"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Install Deno (Windows)
-        run: choco install deno -y
-      
-      - name: Install FFmpeg
-        run: choco install ffmpeg -y
-
-      - name: Install Deno (Windows)
-        run: choco install deno -y
-      
-      - name: Copy FFmpeg binary
-        shell: pwsh
-        run: |
-          $ff = Get-Command ffmpeg | Select-Object -ExpandProperty Source
-          Copy-Item $ff ffmpeg.exe
-      
-      - name: Copy Deno binary (Windows)
-        shell: pwsh
-        run: |
-          $deno = Get-Command deno | Select-Object -ExpandProperty Source
-          Copy-Item $deno deno.exe
-
-      - name: Generate UI Commit File
+      - name: Generate Build Metadata
         shell: bash
         run: |
           mkdir -p assets
-          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+          echo "${{ env.VERSION }}-dev" > assets/version.txt
+          echo "${GITHUB_SHA:0:7}" > assets/commit.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller "yt-dlp[default]"
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+
+      - name: Install & Verify Binaries (Choco)
+        shell: pwsh
+        run: |
+          choco install deno ffmpeg aria2 -y
+          refreshenv
+          mkdir bin
+          Copy-Item "C:\ProgramData\chocolatey\bin\deno.exe" "bin\deno.exe"
+          Copy-Item "C:\ProgramData\chocolatey\bin\ffmpeg.exe" "bin\ffmpeg.exe"
+          Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" "bin\aria2c.exe"
+          Get-FileHash bin/*.exe | Format-List
 
       - name: Build Executable
         shell: pwsh
         run: |
           python -m PyInstaller --clean --noconsole --onefile `
-            --collect-all customtkinter `
-            --collect-all yt_dlp `
+            --collect-all customtkinter --collect-all yt_dlp `
             --add-data "assets;assets" `
-            --add-binary "ffmpeg.exe;." `
-            --add-binary "deno.exe;." `
-            --icon "assets/icon.ico" `
-            --name "${{ env.APP_NAME }}_win64_beta" `
+            --add-binary "bin/ffmpeg.exe;bin" `
+            --add-binary "bin/deno.exe;bin" `
+            --add-binary "bin/aria2c.exe;bin" `
+            --icon "assets/icon.ico" --name "${{ env.APP_NAME }}" 
             main.py
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v6
+      - name: Rename and Prepare Artifact
+        shell: pwsh
+        run: |
+          $VER = Get-Content assets/version.txt
+          $SHA = Get-Content assets/commit.txt
+          $CleanAppName = "${{ env.APP_NAME }}".Replace(" ", "_")
+          $NewName = "${CleanAppName}_${VER}_$SHA"
+          mv "dist/${{ env.APP_NAME }}.exe" "dist/$NewName.exe"
+          echo "FINAL_NAME=$NewName" >> $env:GITHUB_ENV
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@b7c566a # v6.0.0
         with:
           name: windows-dev-build
-          path: dist/${{ env.APP_NAME }}_win64_beta.exe
+          path: dist/${{ env.env.FINAL_NAME }}.exe
 
   build-macos:
     name: Build macOS (Dev)
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
         with:
-          python-version: "3.14"
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Generate Build Metadata
+        run: |
+          mkdir -p assets
+          echo "${{ env.VERSION }}-dev" > assets/version.txt
+          echo "${GITHUB_SHA:0:7}" > assets/commit.txt
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install --upgrade pip
+          pip install pyinstaller "yt-dlp[default]"
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Install Deno (macOS)
-        run: brew install deno
-      
-      - name: Install FFmpeg (Homebrew)
+      - name: Install & Verify Binaries (Brew)
         run: |
-          brew install ffmpeg
-
-      - name: Copy FFmpeg binary
-        run: |
-          FF=$(which ffmpeg)
-          cp "$FF" ./ffmpeg
-          chmod +x ffmpeg
-      
-      - name: Copy Deno binary (macOS)
-        run: |
-          DENO=$(which deno)
-          cp "$DENO" ./deno
-          chmod +x deno
-
-      - name: Generate UI Commit File
-        shell: bash
-        run: |
-          mkdir -p assets
-          echo "${{ github.sha }}" | cut -c1-7 > assets/commit.txt
+          brew install deno ffmpeg aria2
+          mkdir -p bin
+          cp $(which ffmpeg) bin/ffmpeg
+          cp $(which deno) bin/deno
+          cp $(which aria2c) bin/aria2c
+          chmod +x bin/*
+          shasum -a 256 bin/*
 
       - name: Build macOS app
         run: |
           python -m PyInstaller --clean --windowed \
-            --collect-all customtkinter \
-            --collect-all yt_dlp \
+            --collect-all customtkinter --collect-all yt_dlp \
             --add-data "assets:assets" \
-            --add-binary "ffmpeg:." \
-            --add-binary "deno:." \
-            --icon "assets/icon.icns" \
-            --name "${{ env.APP_NAME }}_macOS_beta" \
+            --add-binary "bin/ffmpeg:bin" \
+            --add-binary "bin/deno:bin" \
+            --add-binary "bin/aria2c:bin" \
+            --icon "assets/icon.icns" 
+            --name "${{ env.APP_NAME }}" 
             main.py
 
-      - name: Create DMG with Applications Shortcut
-        id: create_dmg_beta
+      - name: Create DMG
         run: |
           mkdir -p dist/dmg_staging
-          
-          cp -R dist/*.app dist/dmg_staging/
-          
+          cp -R "dist/${{ env.APP_NAME }}.app" dist/dmg_staging/
           ln -s /Applications dist/dmg_staging/Applications
-          
-          hdiutil create -volname "${{ env.APP_NAME }} Beta" \
-            -srcfolder dist/dmg_staging \
-            -ov -format UDZO \
-            "${{ env.APP_NAME }}_macOS_beta.dmg"
-          
-          echo "artifact=${{ env.APP_NAME }}_macOS_beta.dmg" >> $GITHUB_OUTPUT
+          hdiutil create -volname "${{ env.APP_NAME }} Beta" -srcfolder dist/dmg_staging -ov -format UDZO "app_beta.dmg"
+
+      - name: Rename DMG for Artifact
+        run: |
+          VER=$(cat assets/version.txt)
+          SHA=$(cat assets/commit.txt)
+          CLEAN_APP=$(echo "${{ env.APP_NAME }}" | tr ' ' '_')
+          CLEAN_NAME="${CLEAN_APP}_${VER}_$SHA"
+          mv "app_beta.dmg" "${CLEAN_NAME}.dmg"
+          echo "FINAL_NAME_MAC=${CLEAN_NAME}" >> $GITHUB_ENV
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a
         with:
-          # Use a unique name so it doesn't clash with the Windows artifact
           name: macos-dev-build
-          # Ensure this path matches the DMG filename created in the previous step
-          path: ${{ steps.create_dmg_beta.outputs.artifact }}
+          path: ${{ env.FINAL_NAME_MAC }}.dmg
