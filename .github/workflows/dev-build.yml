@@ -72,7 +72,7 @@ jobs:
             main.py
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: windows-dev-build
           path: dist/${{ env.APP_NAME }}_win64_${{ env.VERSION }}.exe
