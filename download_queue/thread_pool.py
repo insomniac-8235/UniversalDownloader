@@ -1,6 +1,7 @@
 import threading
 import time
 import platform
+import os
 import subprocess
 from queue import Empty
 from download_queue.download_queue import DownloadQueue
@@ -53,10 +54,11 @@ class ThreadPoolManager:
 
     def _notify_completion(self, task):
         """Handles post-download logic and UI notification."""
-        self.logger.info(f"Task Completed: {task}")
+        self.logger.info(f"✅ Task Completed: {task}")
         if self.controller:
-            # Add logic here to update your UI via the controller
-            pass
+            # We pass the filename or URL to the controller for the popup
+            filename = os.path.basename(task.get('url', 'Download'))
+            self.controller.show_completion_popup(filename)
 
     def _notify_error(self, task, error_msg):
         """Handles failure logic and UI notification."""
