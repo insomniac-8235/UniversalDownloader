@@ -1,3 +1,4 @@
+import contextlib
 import threading
 from queue import Queue, Empty
 import time
@@ -49,11 +50,11 @@ class ThreadPoolManager:
     def stop(self):
         """Graceful shutdown with proper cleanup"""
         self._shutdown_event.set()
-        
+
         # Wait for threads to finish (max 30 seconds)
         timeout = 30
         start_time = time.time()
-        
+
         while len([t for t in self._thread_pool if t.is_alive()]) > 0:
             if time.time() - start_time > timeout:
                 # Force kill remaining threads
@@ -61,13 +62,11 @@ class ThreadPoolManager:
                     thread.join(timeout=1)
                 break
             time.sleep(0.1)
-            
-        # Ensure ffmpeg processes are killed immediately (per CONVENTIONS.md)
-        try:
+
+        
+        with contextlib.suppress(Exception):
             subprocess.Popen(['taskkill', '/F', '/IM', 'ffmpeg.exe'], 
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
             
     def _worker_loop(self, worker_id):
         """Worker loop with connection pooling and error handling"""

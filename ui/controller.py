@@ -50,12 +50,12 @@ class UIController:
     def setup_ui(self):
         # Initialize fonts
         if sys.platform == "darwin":
-            self.main_font = ctk.CTkFont(family=".AppleSystemUIFont", size=14)
+            self.main_font = ctk.CTkFont(family=".AppleSystemUIFont", size=13, weight="bold")
             self.input_font = ctk.CTkFont(family="Menlo", size=14)
             self.version_font = ctk.CTkFont(family=".AppleSystemUIFont", size=10)
             self.button_font = ctk.CTkFont(family=".AppleSystemUIFont", size=15, weight="bold")
         else:
-            self.main_font = ctk.CTkFont(family="Segoe UI", size=14)
+            self.main_font = ctk.CTkFont(family="Segoe UI", size=13, weight="bold")
             self.input_font = ctk.CTkFont(family="Consolas", size=14)
             self.version_font = ctk.CTkFont(family="Segoe UI", size=10)
             self.button_font = ctk.CTkFont(family="Segoe UI", size=15, weight="bold")

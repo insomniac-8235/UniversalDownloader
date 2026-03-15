@@ -18,7 +18,7 @@ class UniversalDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
         
-        self.title("")
+        self.title("Universal Downloader")
     
         self.geometry("500x400")
         self.resizable(False, False)
