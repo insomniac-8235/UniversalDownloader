@@ -19,23 +19,24 @@ class UniversalDownloader(ctk.CTk):
         super().__init__()
         
         self.title("")
+    
         self.geometry("500x400")
         self.resizable(False, False)
         self.configure(bg=THEME["APP_BG"])
         
         # macOS-specific icon setup
-        if sys.platform == "darwin":
-            for icon_ext in [".png", ".icns", ".ico"]:
-                icon_path = os.path.join(os.path.dirname(__file__), 'assets', f'icon{icon_ext}')
-                if os.path.exists(icon_path):
-                    try:
-                        img = Image.open(icon_path)
-                        photo = ImageTk.PhotoImage(img)
-                        self.iconphoto(False, photo)
-                        self._icon_reference = photo
-                        break
-                    except Exception as e:
-                        print(f"Icon failed to load: {e}")
+        # if sys.platform == "darwin":
+        #     for icon_ext in [".png", ".icns", ".ico"]:
+        #         icon_path = os.path.join(os.path.dirname(__file__), 'assets', f'icon{icon_ext}')
+        #         if os.path.exists(icon_path):
+        #             try:
+        #                 img = Image.open(icon_path)
+        #                 photo = ImageTk.PhotoImage(img)
+        #                 self.iconphoto(False, photo)
+        #                 self._icon_reference = photo
+        #                 break
+        #             except Exception as e:
+        #                 print(f"Icon failed to load: {e}")
         
         # Initialize a shared logger instance for the application
         self.logger = MyLogger(level=DEBUG) 

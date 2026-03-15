@@ -2,7 +2,6 @@ import threading
 from queue import Queue, Empty
 import time
 import subprocess
-from typing import Callable, Dict, Any, Optional 
 
 from .download_queue import DownloadQueue
 from utilities.logger import MyLogger, DEBUG

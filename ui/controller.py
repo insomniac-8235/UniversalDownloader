@@ -296,7 +296,7 @@ class UIController:
         self.root.after(0, lambda: self.download_btn.configure(
             state="disabled",
             text="Download Complete",
-            fg_color=self.theme["BTN_ACTION"],
+            fg_color=self.theme["BTN_DISABLED"],
             hover_color=self.theme["BTN_HOVER"],
             text_color=self.theme["TEXT_ACTION_BTN"]
         ))

@@ -1,3 +1,4 @@
+import contextlib
 from yt_dlp import YoutubeDL
 from typing import Optional, Dict, Any, Callable
 import os
@@ -111,20 +112,18 @@ class DownloadWorker:
         """Set a progress update callback"""
         self.progress_hook = callback
         
-    def get_ffmpeg_path(self) -> str:
-        """Get the path to the ffmpeg executable"""
-        return get_ffmpeg_path()
+    # def get_ffmpeg_path(self) -> str:
+    #     """Get the path to the ffmpeg executable"""
+    #     return get_ffmpeg_path()
 
-    def get_deno_path(self) -> str:
-        """Get the path to the deno executable"""
-        return self._deno_path
+    # def get_deno_path(self) -> str:
+    #     """Get the path to the deno executable"""
+    #     return self._deno_path
     
     def stop(self):
         """Stop the download process"""
         if hasattr(self, 'ydl'):
-            try:
+            with contextlib.suppress(Exception):
                 # Cancel current download by setting a flag
                 if hasattr(self.ydl, '_downloader'):
                     self.ydl._downloader.params['cancel'] = True
-            except Exception:
-                pass
