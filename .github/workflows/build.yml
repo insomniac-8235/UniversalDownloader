@@ -6,7 +6,7 @@ on:
       - "v*"  # ONLY trigger on tags, never on a regular branch push
 
 env:
-  APP_NAME: UniversalDownloader
+  APP_NAME: "Universal Downloader"
   VERSION: ${{ github.ref_name }}  # Git tag version
 
 jobs:

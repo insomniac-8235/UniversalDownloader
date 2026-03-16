@@ -310,8 +310,8 @@ class UIController:
         # Check if the widget is a Button
         elif isinstance(widget, ctk.CTkButton):
             widget.configure(
-                fg_color=self.theme["BTN_HOVER"][idx], # Light blue
-                text_color=self.theme["TEXT_ACTION_BTN"][idx] # Keep button text white
+                fg_color=self.theme["BTN_HOVER"], # Light blue
+                text_color=self.theme["TEXT_ACTION_BTN"] # Keep button text white
             )
 
     def on_focus_out(self, widget):
@@ -321,14 +321,14 @@ class UIController:
         if isinstance(widget, ctk.CTkEntry):
             # If entry is empty, use default border; if full, keep it clean
             widget.configure(
-                border_color=self.theme["BORDER_DEFAULT"][idx],
-                text_color=self.theme["TEXT_MAIN"][idx]
+                border_color=self.theme["BORDER_DEFAULT"],
+                text_color=self.theme["TEXT_MAIN"]
             )
         
         elif isinstance(widget, ctk.CTkButton):
             widget.configure(
-                fg_color=self.theme["BTN_ACTION"][idx], # Darker blue
-                text_color=self.theme["TEXT_ACTION_BTN"][idx]
+                fg_color=self.theme["BTN_ACTION"], # Darker blue
+                text_color=self.theme["TEXT_ACTION_BTN"]
             )
     
     def select_folder(self):
@@ -488,7 +488,6 @@ class UIController:
             hover_color=self.theme["BTN_HOVER"]
         )
         self.audio_switch.configure(state="normal")
-
         # Call the toggle function to restore the correct colors based on current state
         self.on_audio_switch_toggle()
         
