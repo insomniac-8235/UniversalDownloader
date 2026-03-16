@@ -20,7 +20,7 @@ def setup_env():
     """Injects /bin into the system PATH so yt-dlp finds deno/ffmpeg/aria2c."""
     bin_dir = os.path.join(BASE_DIR, "bin")
     if os.path.exists(bin_dir):
-        os.environ["PATH"] = bin_dir + os.pathsep + os.environ["PATH"]
+        os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
 
 setup_env()
 
@@ -34,43 +34,63 @@ from utils.theme import THEME
 class UniversalDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
-        
-        # Load Metadata (Single Source of Truth from GitHub Action)
-        self.version_info = self._load_metadata()
-        
-        self.title(f"Universal Downloader")
-        self.geometry("500x400")
-        self.resizable(False, False)
+
+        ctk.set_appearance_mode("system")
         self.configure(bg=THEME["APP_BG"])
-        
-        self.logger = MyLogger(level=DEBUG) 
-        
-        # Icon & Binary Checks
-        self._setup_icons()
-        self._check_binary_integrity()
-        
-        # Core Stack Initialization
-        self.worker = DownloadWorker(self.logger) 
-        self.controller = UIController(self, None) 
+        self.title("Universal Downloader")
+
+        # Dynamic scaling
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        width = int(screen_width * 0.2)
+        height = int(screen_height * 0.3)
+        self.geometry(f"{width}x{height}")
+        self.minsize(500, 500)
+
+        # Logger
+        self.logger = MyLogger(level=DEBUG)
+
+        # Icon & binary checks
+        self.setup_icons()
+        self.check_binary_integrity()
+
+        # --- CORE STACK ---
+        # 1. Worker
+        self.worker = DownloadWorker(self.logger)
+
+        # 2. Controller (pass worker so it can start/cancel downloads)
+        self.controller = UIController(self, worker=self.worker)
+
+        # 3. Queue manager
         self.queue_manager = ThreadPoolManager(
-            worker=self.worker, 
-            max_workers=4, 
+            worker=self.worker,
+            max_workers=4,
             controller=self.controller
         )
         self.controller.queue = self.queue_manager
         self.queue_manager.start()
 
-    def _load_metadata(self):
+        # Hook worker progress to UIController
+        self.worker.set_progress_hook(self.controller.on_worker_progress)
+
+    def load_metadata(self):
         """Pulls the version and commit baked in during the build."""
         try:
             v_path = os.path.join(BASE_DIR, 'assets', 'version.txt')
             c_path = os.path.join(BASE_DIR, 'assets', 'commit.txt')
             with open(v_path, 'r') as v, open(c_path, 'r') as c:
-                return f"{v.read().strip()} ({c.read().strip()})"
-        except:
+                version = v.read().strip()
+                commit = c.read().strip()
+        except FileNotFoundError:
+            self.logger.error("Version or commit file not found.")
             return "v0.0.0-dev (Local)"
+        except Exception as e:
+            self.logger.error(f"Error reading metadata: {e}")
+            return "v0.0.0-dev (Local)"
+        
+        return f"{version} ({commit})"
 
-    def _setup_icons(self):
+    def setup_icons(self):
         """Cross-platform icon handling using BASE_DIR."""
         assets_dir = os.path.join(BASE_DIR, 'assets')
         
@@ -87,7 +107,7 @@ class UniversalDownloader(ctk.CTk):
                 self.iconphoto(False, photo)
                 self._icon_ref = photo # Crucial to prevent garbage collection
 
-    def _check_binary_integrity(self):
+    def check_binary_integrity(self):
         """Layer 2 Enforcer: Verify tools are present in the environment."""
         from shutil import which
         tools = ["ffmpeg", "deno", "aria2c"]

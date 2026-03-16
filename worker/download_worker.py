@@ -1,65 +1,59 @@
 import contextlib
-from yt_dlp import YoutubeDL
-from typing import Optional, Dict, Any, Callable
+import threading
 import os
+from typing import Optional, Dict, Any, Callable
+from yt_dlp import YoutubeDL
 from utils.logger import MyLogger
 from utils.paths import get_deno_path, get_ffmpeg_path, get_aria2c_path
+
 
 class DownloadWorker:
     def __init__(self, logger=None):
         self.logger = logger or MyLogger()
-        self.progress_hook = None
-        
-        # Cache the Deno path once we discover it
+        self.progress_hook: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.ydl: Optional[YoutubeDL] = None
+        self.cancel_event = threading.Event()
+
+        # Discover Deno
         try:
             self._deno_path = get_deno_path()
         except FileNotFoundError:
-            # Keep None – download_media will raise a friendly error
             self._deno_path = None
-            
-        # Discover and cache the aria2c path
+
+        # Discover aria2c
         self._aria2c_path: Optional[str] = None
         try:
             self._aria2c_path = get_aria2c_path()
             if self._aria2c_path:
                 self.logger.info(f"Found aria2c at: {self._aria2c_path}")
             else:
-                self.logger.info("aria2c not found. Falling back to default downloader.")
+                self.logger.info("aria2c not found. Using default downloader.")
         except Exception as e:
             self.logger.warning(f"Could not check for aria2c: {e}", exc_info=True)
-            
-    def download(self, url: str, folder: str, is_audio: bool) -> bool:
-        """Handle the actual media download process"""
+
+    def start_download_threaded(self, url: str, folder: str, is_audio: bool):
+        """Start download in a background thread"""
+        t = threading.Thread(target=self.download, args=(url, folder, is_audio), daemon=True)
+        t.start()
+
+    def download(self, url: str, folder: str, is_audio: bool):
+        """Main download entry point (blocking)"""
+        self.cancel_event.clear()
         try:
-            return self._extracted_from_download_8(is_audio, folder, url)
+            return self.execute_download(is_audio, folder, url)
         except Exception as e:
-            error_msg = str(e)
-
-            # Handle specific errors per CONVENTIONS.md
-            if "Sign-in required" in error_msg or "sign in" in error_msg.lower():
-                self.logger.error("Sign-in required for this URL")
-            elif "Codec not found" in error_msg:
-                self.logger.error("Codec not found. Please install ffmpeg.")
-            else:
-                self.logger.error(f"Download failed: {error_msg}")
-
+            self.logger.error(f"Download failed: {e}")
             raise
 
-    # TODO Rename this here and in `download`
-    def _extracted_from_download_8(self, is_audio, folder, url):
-        # REMOVED: _total_bytes is no longer needed for indeterminate progress
-        # self._total_bytes = 0 
-
-        # Ensure ffmpeg is properly configured
+    def execute_download(self, is_audio: bool, folder: str, url: str) -> bool:
+        # Validate ffmpeg
         ffmpeg_path = get_ffmpeg_path()
         if not ffmpeg_path:
             raise FileNotFoundError("FFmpeg not found in PATH")
 
-        # Make sure we have a Deno binary before proceeding
+        # Validate deno
         if not self._deno_path:
-            raise FileNotFoundError(
-                "Deno binary not found. Please install Deno or set DENO_PATH."
-            )
+            raise FileNotFoundError("Deno binary not found. Install or set DENO_PATH.")
 
         ydl_opts = {
             'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
@@ -69,63 +63,52 @@ class DownloadWorker:
             'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
             'logger': self.logger,
             'progress_hooks': [self],
-
-            # Correctly-structured js_runtimes:
-            #   runtime name → config dict (executable_path + options list)
             'js_runtimes': {
                 'deno': {
                     'executable_path': self._deno_path,
-                    'options': []          # ← leave empty unless extra flags are needed
+                    'options': []
                 }
-            },
+            }
         }
 
         if self._aria2c_path:
-            self.logger.info("Using aria2c for multi-threaded downloading.")
             ydl_opts['external_downloader'] = self._aria2c_path
             ydl_opts['external_downloader_args'] = [
-                '--summary-interval=1',  # Force progress updates every second
-                '-x', '16',              # Max 16 connections per server
-                '-s', '16',              # Split file into 16 parts
-                '-k', '1M',              # Minimum split size of 1MB
-                '-c'                     # ADDED: Ensure continue/resume functionality per CONVENTIONS.md
+                '--summary-interval=1',
+                '-x', '8',
+                '-s', '8',
+                '-k', '1M',
+                '-c'
             ]
+            self.logger.info("Using aria2c for multi-threaded downloads.")
 
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        self.ydl = YoutubeDL(ydl_opts)
+        try:
+            with self.ydl as ydl:
+                ydl.download([url])
+        finally:
+            self.ydl = None
 
         return True
-            
-    def download_progress_hook(self, d: Dict[str, Any]) -> None:
-        """Progress hook for yt-dlp to update download progress"""
-        # Simply pass the entire progress dictionary 'd' to the external hook.
-        # The UIController will interpret the 'status' key for indeterminate progress.
+
+    def __call__(self, d: Dict[str, Any]):
+        """yt-dlp calls this for progress updates"""
+        if self.cancel_event.is_set():
+            raise Exception("Download cancelled")
+
         if self.progress_hook:
             try:
                 self.progress_hook(d)
             except Exception as e:
-                self.logger.error(f"Error in DownloadWorker progress_hook callback: {e}", exc_info=True)
-            
-    def __call__(self, d: Dict[str, Any]) -> None:
-        """Handle progress updates (this is called by yt-dlp)"""
-        self.download_progress_hook(d)
-        
-    def set_progress_hook(self, callback: Callable[[Dict[str, Any]], None]) -> None: # MODIFIED type hint
-        """Set a progress update callback"""
-        self.progress_hook = callback
-        
-    # def get_ffmpeg_path(self) -> str:
-    #     """Get the path to the ffmpeg executable"""
-    #     return get_ffmpeg_path()
+                self.logger.error(f"Error in progress_hook: {e}", exc_info=True)
 
-    # def get_deno_path(self) -> str:
-    #     """Get the path to the deno executable"""
-    #     return self._deno_path
-    
-    def stop(self):
-        """Stop the download process"""
-        if hasattr(self, 'ydl'):
+    def set_progress_hook(self, callback: Callable[[Dict[str, Any]], None]):
+        """Attach a UI progress callback"""
+        self.progress_hook = callback
+
+    def cancel(self):
+        """Cancel current download"""
+        self.cancel_event.set()
+        if self.ydl and hasattr(self.ydl, "_downloader"):
             with contextlib.suppress(Exception):
-                # Cancel current download by setting a flag
-                if hasattr(self.ydl, '_downloader'):
-                    self.ydl._downloader.params['cancel'] = True
+                self.ydl._downloader.params["cancel"] = True

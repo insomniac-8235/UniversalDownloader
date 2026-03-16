@@ -1,9 +1,11 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import Tk, filedialog
 import os
 import sys
-from typing import Dict, Any 
 from utils.theme import THEME
+from worker.download_worker import DownloadWorker
+
+
 
 class ThemedDialog(ctk.CTkToplevel):
     def __init__(self, master, title, message):
@@ -28,10 +30,17 @@ class ThemedDialog(ctk.CTkToplevel):
 
 class UIController:
     # MODIFIED: queue_manager can be None initially to handle circular dependency
-    def __init__(self, root, queue_manager=None):
+    def __init__(self, root, worker=None, queue_manager=None):
         self.root = root
+        self.worker = worker
+        self.progress_title = None  # Initialize progress_title attribute
         self.queue = queue_manager # Store queue_manager
-        
+        # Create the progress title widget
+        # self.create_progress_title(1)
+
+        # Bind the worker progress hook to the on_worker_progress method
+        self.worker.set_progress_hook(self.on_worker_progress)
+
         # Copy module-level THEME to instance (avoid mutation issues)
         self.theme = THEME.copy()
         
@@ -40,12 +49,10 @@ class UIController:
         self.setup_ui()
         self.bind_events()
         self._debounce_timer = None
-        
-        # REMOVED: No longer needs to establish progress callback here.
-        # This is now handled when ThreadPoolManager is initialized in main.py
-        # because ThreadPoolManager stores a reference to this UIController.
-        # self.queue.set_progress_callback(self.on_progress_update)
-        
+
+        self.downloading = False
+        self.current_task = None
+
     def setup_ui(self):
         # Initialize fonts
         if sys.platform == "darwin":
@@ -201,11 +208,20 @@ class UIController:
             fg_color=self.theme["PROG_BG"],
             progress_color=self.theme["PROG_FILL"],
             corner_radius=8,
-            mode="indeterminate" # CHANGED: Set to indeterminate mode
+            mode="determinate"
         )
-        # REMOVED: self.progress_bar.set(0) # Not needed for indeterminate mode
+        self.progress_bar.set(0)
         self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 20))
         
+        self.download_card = ctk.CTkFrame(
+            self.content_frame,
+            corner_radius=16,
+            fg_color=self.theme["ENTRY_BG"]
+        )
+
+        self.download_card.grid(row=6, column=0, columnspan=2, sticky="we", pady=(10,20))
+        self.download_card.grid_columnconfigure(0, weight=1)
+
         # Download Button
         self.download_btn = ctk.CTkButton(
             self.content_frame,
@@ -245,33 +261,70 @@ class UIController:
         self.url_entry.bind("<FocusOut>", lambda e: self.on_focus_out(self.url_entry))
         self.url_entry.bind("<Enter>", lambda e: self.url_entry.configure(border_color=self.theme["BORDER_HOVER"]))
         self.url_entry.bind("<Leave>", lambda e: self.on_focus_out(self.url_entry))
-        self.url_entry.bind("<KeyRelease>", self._debounced_validate_inputs)
+        self.url_entry.bind("<KeyRelease>", self.debounced_validate_inputs)
         
         # Folder Entry Events - batch updates to respect 10Hz limit
         self.folder_entry.bind("<FocusIn>", lambda e: self.on_focus_in(self.folder_entry))
         self.folder_entry.bind("<FocusOut>", lambda e: self.on_focus_out(self.folder_entry))
         self.folder_entry.bind("<Enter>", lambda e: self.folder_entry.configure(border_color=self.theme["BORDER_HOVER"]))
         self.folder_entry.bind("<Leave>", lambda e: self.on_focus_out(self.folder_entry))
-        self.folder_entry.bind("<KeyRelease>", self._debounced_validate_inputs)
+        self.folder_entry.bind("<KeyRelease>", self.debounced_validate_inputs)
         
         # Download Button - batch update on state change
         # UPDATE: Change the download_btn command to call start_download
         self.download_btn.configure(command=self.start_download)
 
-    def start_download(self):
-        """Validate inputs and trigger the queue if valid"""
-        url = self.url_entry.get().strip()
-        folder = self.folder_entry.get().strip()
-        
-        # Basic URL validation
-        if not url.startswith("http"):
-            self.on_invalid_url("URL must start with http:// or https://")
-            return
-            
-        # If valid, proceed to queue
-        if self.queue:
-            # This calls the new method we just added
-            self.queue.enqueue(url, folder, self.audio_switch.get())
+    def update_status(self, message, success=True):
+        """Update the status label with a message"""
+        color = "green" if success else "red"
+        self.status_label.config(text=message, fg=color)
+        self.root.update_idletasks()
+
+    def download_success(self, task_info):
+        """Handle successful download"""
+        message = f"Task Completed: {task_info}"
+        self.update_status(message, success=True)
+
+    def download_error(self, task_info):
+        """Handle failed download"""
+        message = f"ERROR: Worker {task_info['worker_id']} error: {task_info.get('error', 'Unknown error')}"
+        self.update_status(message, success=False)
+    
+    def stop_progress(self):
+        """Stop the progress bar and reset it"""
+        self.progress_bar.config(value=0)
+        self.progress_bar["state"] = "disabled"
+
+    # def start_download(self):
+
+    #     if self.downloading:
+    #         # Cancel download
+    #         if self.queue:
+    #             self.queue.stop_current()
+    #         self.set_downloading_state(False)
+    #         return
+
+    #     url = self.url_entry.get().strip()
+    #     folder = self.folder_entry.get().strip()
+
+    #     if not url.startswith("http"):
+    #         self.on_invalid_url("URL must start with http:// or https://")
+    #         return
+
+    #     self.current_task = {
+    #         "url": url,
+    #         "folder": folder,
+    #         "audio": self.audio_switch.get()
+    #     }
+
+    #     self.set_downloading_state(True)
+
+    #     if self.queue:
+    #         self.queue.enqueue(
+    #             url,
+    #             folder,
+    #             self.audio_switch.get()
+    #         )
 
     def on_invalid_url(self, error_msg: str):
         """Handle invalid URL errors"""
@@ -303,22 +356,19 @@ class UIController:
         except Exception as e:
             return f"Error loading version: {str(e)}"
 
-    # REMOVED: set_progress_callback is no longer needed in UIController
-    # def set_progress_callback(self, callback):
-    #     """Set the progress callback to be called when download progress updates"""
-    #     self._progress_callback = callback
-        
     def on_focus_in(self, widget):
-        widget.configure(border_color=self.theme["ENTRY_FOCUS"])
-        widget.configure(text_color=(self.theme["TEXT_MAIN"]))
-        widget.configure(border_color=self.theme["ENTRY_FOCUS"])
-        
+        if widget == self.url_entry or widget == self.folder_entry:
+            widget.configure(border_color=self.theme["ENTRY_FOCUS"])
+            widget.configure(text_color=self.theme["TEXT_MAIN"])
+
     def on_focus_out(self, widget):
         if not widget.get().strip():
             widget.configure(border_color=self.theme["BORDER_DEFAULT"])
+            widget.configure(text_color=self.theme["TEXT_GHOST"])
         else:
-            widget.configure(border_color=self.theme["BORDER_DEFAULT"])
-            widget.configure(text_color=self.theme["TEXT_MAIN"])
+            widget.configure(border_color=self.theme["ENTRY_FOCUS"])
+            widget.configure(text_color=self.theme["TEXT_ENTRY"])
+
     
     def select_folder(self):
         if folder := filedialog.askdirectory():
@@ -337,54 +387,42 @@ class UIController:
             self.url_entry.insert(0, text)
             self.validate_inputs()
 
-    def on_download_complete(self, url, folder, is_audio):
-        """Handle download completion and show popup"""
-        # Ensure UI updates are on the main thread
-        self.view.after(0, lambda: self.progress_bar.stop())
-        self.view.after(0, lambda: self.progress_bar.set(0)) 
+    # def on_download_complete(self, url, folder, is_audio):
+    #     """Handle download completion and show popup"""
+    #     # Ensure UI updates are on the main thread
+    #     self.root.after(0, lambda: self.progress_bar.stop())
+    #     self.root.after(0, lambda: self.progress_bar.set(0)) 
         
-        # Re-enable the button or set it to "Ready"
-        self.view.after(0, lambda: self.download_btn.configure(
-            state="normal", # Changed from 'disabled' so you can download again!
-            text="Download Another",
-            fg_color=self.theme["BTN_NORMAL"]
-        ))
+    #     # Re-enable the button or set it to "Ready"
+    #     self.root.after(0, lambda: self.download_btn.configure(
+    #         state="normal", # Changed from 'disabled' so you can download again!
+    #         text="Download Another",
+    #         fg_color=self.theme["BTN_DISABLED"]
+    #     ))
         
-        # Show your custom ThemedDialog
-        self.view.after(100, lambda: ThemedDialog(
-            self.view, 
-            "Download Complete", 
-            f"Successfully saved to:\n{folder}"
-        ))
+    #     # Show your custom ThemedDialog
+    #     self.root.after(100, lambda: ThemedDialog(
+    #         self.root, 
+    #         "Download Complete", 
+    #         f"Successfully saved to:\n{folder}"
+    #     ))
         
-    def on_download_error(self, error_msg):
-        """Handle download errors"""
-        # Ensure UI updates are on the main thread
-        self.root.after(0, lambda: self.progress_bar.stop()) 
-        self.root.after(0, lambda: self.progress_bar.set(0)) 
+    # def on_download_error(self, url, folder, error_msg):
+    #     """Handle download errors"""
+    #     # Ensure UI updates are on the main thread
+    #     self.root.after(0, lambda: self.progress_bar.stop()) 
+    #     self.root.after(0, lambda: self.progress_bar.set(0)) 
         
-        self.root.after(0, lambda: self.download_btn.configure(
-            state="disabled",
-            text="Download Failed",
-            fg_color=self.theme["BTN_DISABLED"],
-            hover_color=self.theme["BTN_HOVER"],
-            text_color_disabled=self.theme["TEXT_DISABLED"]
-        ))
+    #     self.root.after(0, lambda: self.download_btn.configure(
+    #         state="disabled",
+    #         text="Download Failed",
+    #         fg_color=self.theme["BTN_DISABLED"],
+    #         hover_color=self.theme["BTN_HOVER"],
+    #         text_color_disabled=self.theme["TEXT_DISABLED"]
+    #     ))
         
         # Show error popup
         self.root.after(100, lambda: ThemedDialog(self.root, "Download Error", f"Download failed:\n{error_msg}"))
-
-    def on_progress_update(self, d: Dict[str, Any]): 
-        """Handle progress updates from the download worker to control indeterminate bar"""
-        status = d.get('status')
-        # Schedule the UI update on the main thread to prevent errors
-        if status == 'downloading':
-            self.root.after(0, self.progress_bar.start) # Start indeterminate bar
-        elif status in ['finished', 'error']:
-            self.root.after(0, self.progress_bar.stop)  # Stop indeterminate bar
-            self.root.after(0, lambda: self.progress_bar.set(0)) # Reset to empty
-        # If 'status' is not downloading, finished, or error, the bar remains in its current state
-        # (e.g., pre-processing state, where it might be stopped initially or awaiting status).
 
     def validate_inputs(self):
         """Validate inputs and enable/disable download button based on validity"""
@@ -407,9 +445,176 @@ class UIController:
                 text_color_disabled=self.theme["TEXT_DISABLED"]
             )
 
-    def _debounced_validate_inputs(self, event):
+    def debounced_validate_inputs(self, event):
         """Debounced input validation to respect 10Hz limit"""
         if self._debounce_timer is not None:
             self.root.after_cancel(self._debounce_timer)
         
         self._debounce_timer = self.root.after(100, self.validate_inputs)
+
+    def set_downloading_state(self, active: bool):
+        """Lock or unlock UI controls."""
+
+        self.downloading = active
+        entry_state = "disabled" if active else "normal"
+
+        self.url_entry.configure(state=entry_state)
+        self.folder_entry.configure(state=entry_state)
+        self.audio_switch.configure(state=entry_state)
+        self.paste_btn.configure(state=entry_state)
+        self.folder_browse_btn.configure(state=entry_state)
+
+        if active:
+            self.download_btn.configure(
+                text="Cancel",
+                state="normal",
+                fg_color="#d9534f"
+            )
+            self.progress_bar.start()
+        else:
+            self.download_btn.configure(
+                text="Download",
+                state="normal",
+                fg_color=self.theme["BTN_ACTION"]
+            )
+            self.progress_bar.stop()
+            self.progress_bar.set(0)
+
+    # def on_worker_progress(self, d: Dict[str, Any]):
+
+    #     status = d.get("status")
+
+    #     if status == "downloading":
+
+    #         percent_str = d.get("_percent_str", "0%")
+    #         speed = d.get("_speed_str", "")
+    #         eta = d.get("_eta_str", "")
+    #         downloaded = d.get("_downloaded_bytes_str", "")
+    #         total = d.get("_total_bytes_str", "")
+
+    #         try:
+    #             percent = float(percent_str.replace("%","")) / 100
+    #         except Exception:
+    #             percent = 0
+
+    #         self.root.after(0, lambda: self.progress_bar.set(percent))
+
+    #         self.root.after(0, lambda: self.metric_size.configure(
+    #             text=f"{downloaded} / {total}"
+    #         ))
+
+    #         self.root.after(0, lambda: self.metric_speed.configure(
+    #             text=speed
+    #         ))
+
+    #         self.root.after(0, lambda: self.metric_eta.configure(
+    #             text=f"ETA {eta}"
+    #         ))
+
+    #         self.root.after(0, lambda: self.progress_title.configure(
+    #             text=f"Downloading {percent_str}"
+    #         ))
+
+    #     elif status == "finished":
+
+    #         self.root.after(0, lambda: self.progress_title.configure(
+    #             text="Processing file..."
+    #         ))
+
+    def on_progress_update(self, progress_data: dict):
+        """
+        Receives download progress from the worker.
+        Can forward it to the progress bar or a card.
+        """
+        status = progress_data.get('status')
+        if status == 'downloading':
+            percent_str = progress_data.get('_percent_str', '0%')
+            # Convert to float
+            try:
+                value = float(percent_str.strip('%')) / 100
+                self.progress_bar.set(value)
+            except:
+                self.progress_bar.start()  # fallback to indeterminate
+        elif status in ['finished', 'error']:
+            self.progress_bar.stop()
+
+    def animate_progress(self):
+        value = self.progress_bar.get()
+        self.progress_bar.set(min(value + 0.002, 1))
+        if self.downloading:
+            self.root.after(50, self.animate_progress)
+
+            self.animate_progress()
+
+    def finish_download_ui(self, success=True):
+            """Restore UI after download completes or is canceled"""
+            self.url_entry.configure(state="normal")
+            self.folder_entry.configure(state="normal")
+            self.folder_browse_btn.configure(state="normal")
+            self.paste_btn.configure(state="normal")
+            self.audio_switch.configure(state="normal")
+
+            self.download_btn.configure(
+                text="Download",
+                fg_color=self.theme["BTN_ACTION"]
+            )
+
+            self.downloading = False
+            self.progress_bar.set(0)    
+
+        # --- DOWNLOAD BUTTON ---
+    def start_download(self):
+        url = self.url_entry.get().strip()
+        folder = self.folder_entry.get().strip()
+        is_audio = self.audio_switch.get()
+
+        if not url or not folder:
+            return  # Maybe show a ThemedDialog warning
+
+        # Disable fields & change button to Cancel
+        self.url_entry.configure(state="disabled")
+        self.folder_entry.configure(state="disabled")
+        self.download_btn.configure(text="Cancel", command=self.cancel_download)
+
+        # Start download in background
+        self.worker.start_download_threaded(url, folder, is_audio)
+
+    def lock_inputs(self):
+        """Disable entries and switches while downloading"""
+        self.url_entry.configure(state="disabled")
+        self.folder_entry.configure(state="disabled")
+        self.folder_browse_btn.configure(state="disabled")
+        self.paste_btn.configure(state="disabled")
+        self.audio_switch.configure(state="disabled")
+
+    def unlock_inputs(self):
+        """Re-enable entries and switches after download"""
+        self.url_entry.configure(state="normal")
+        self.folder_entry.configure(state="normal")
+        self.folder_browse_btn.configure(state="normal")
+        self.paste_btn.configure(state="normal")
+        self.audio_switch.configure(state="normal")
+
+    def cancel_download(self):
+        self.worker.cancel()
+        self.download_btn.configure(text="Download", command=self.start_download)
+        self.url_entry.configure(state="normal")
+        self.folder_entry.configure(state="normal")
+
+    def create_progress_title(self):
+        """Create and configure the progress title widget."""
+        self.progress_title = ctk.CTkLabel(
+            self.root, 
+            text="Progress:", 
+            font=("Helvetica", 12), 
+            bg=self.root.THEME["APP_BG"],
+            fg="#333"
+        )
+        self.progress_title.pack(side=ctk.TOP, fill=ctk.X, padx=10, pady=5)
+
+    def on_worker_progress(self, progress):
+        """Update the progress title based on worker progress."""
+        if self.progress_title:
+            self.progress_title.config(text=f"Progress: {progress}%")
+        else:
+            self.logger.error("UIController.progress_title is not initialized.")

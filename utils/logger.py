@@ -2,7 +2,7 @@ import time
 import threading
 from queue import Queue, Empty
 import sys
-import traceback # ADD THIS IMPORT
+import traceback
 
 # Define logging levels for clarity and control
 DEBUG = 10
@@ -70,7 +70,7 @@ class MyLogger:
                 
     def progress(self, msg: str):
         """Log text-based progress messages with strict rate limiting (max 10Hz).
-           Note: UI progress bar updates are handled by the separate progress_hook callback."""
+        Note: UI progress bar updates are handled by the separate progress_hook callback."""
         current_time = time.time()
         with self._progress_lock:
             if current_time - self._last_progress_time >= 0.1:  # Max 10Hz

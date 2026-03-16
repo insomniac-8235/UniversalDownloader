@@ -4,9 +4,9 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+"""Consolidated binary lookup for Unified /bin structure (Bundle & Dev aware)"""
+
 class PathCache:
-    """Consolidated binary lookup for Unified /bin structure (Bundle & Dev aware)"""
-    
     def __init__(self):
         self._cache = {}
         # 1. Determine the True Root
