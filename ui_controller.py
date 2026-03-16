@@ -3,9 +3,8 @@ from tkinter import filedialog
 import os
 import sys
 import threading
-from typing import Callable, Optional
-from downloader import DownloadManager
-from utilities import MyLogger, THEME, ProgressParser
+from typing import Optional
+from utilities import THEME, ProgressParser
 from yt_dlp import YoutubeDL
 
 class UIController:
@@ -57,7 +56,6 @@ class UIController:
         self.url_label = ctk.CTkLabel(
             self.content_frame,
             text="Media URL",
-            fg_color=self.theme["APP_BG"],
             font=self.main_font,
             text_color=self.theme["TEXT_MAIN"]
         )
@@ -78,9 +76,10 @@ class UIController:
             height=55,
             corner_radius=18,
             font=self.input_font,
-            bg_color=self.theme["APP_BG"],
+            placeholder_text_color=self.theme["TEXT_GHOST"],
+            fg_color=self.theme["ENTRY_BG"],
             text_color=self.theme["TEXT_MAIN"],
-            border_width=1,
+            border_width=0,
         )
         self.url_entry.grid(row=0, column=0, sticky="we")
         
@@ -93,7 +92,7 @@ class UIController:
             font=self.button_font,
             bg_color=self.theme["ENTRY_BG"],
             fg_color=self.theme["BTN_ACTION"],
-            text_color=self.theme["TEXT_ACTION"],
+            text_color=self.theme["TEXT_ACTION_BTN"],
             hover_color=self.theme["BTN_HOVER"],
             command=self.paste_url_from_clipboard
         )
@@ -124,10 +123,10 @@ class UIController:
             height=55,
             corner_radius=18,
             font=self.input_font,
-            bg_color=self.theme["APP_BG"],
-            text_color=self.theme["TEXT_GHOST"],
-            border_width=1,
-            border_color=self.theme["BORDER_DEFAULT"]
+            placeholder_text_color=self.theme["TEXT_GHOST"],
+            fg_color=self.theme["ENTRY_BG"],
+            text_color=self.theme["TEXT_MAIN"],
+            border_width=0,
         )
         self.folder_entry.grid(row=0, column=0, sticky="we")
         
@@ -140,13 +139,14 @@ class UIController:
             font=self.button_font,
             bg_color=self.theme["ENTRY_BG"],
             fg_color=self.theme["BTN_ACTION"],
-            text_color=self.theme["TEXT_ACTION"],
+            text_color=self.theme["TEXT_ACTION_BTN"],
             hover_color=self.theme["BTN_HOVER"],
             command=self.select_folder
         )
         self.folder_browse_btn.place(relx=1.0, rely=0.49, x=-10, y=0, anchor="e")
         
         # Audio Switch
+        
         self.audio_label = ctk.CTkLabel(
             self.content_frame,
             text="Audio Only",
@@ -155,20 +155,28 @@ class UIController:
         )
         self.audio_label.grid(row=4, column=0, sticky="w", pady=(0, 20))
         
+        # 1. Create a variable to track state
+        self.switch_var = ctk.IntVar(value=0) 
+
         self.audio_switch = ctk.CTkSwitch(
             self.content_frame,
             text="",
-            switch_width=40,
+            variable=self.switch_var, # Link the variable here
+            switch_width=50,
             switch_height=20,
-            fg_color=self.theme["ENTRY_BG"],
-            progress_color=self.theme["BTN_ACTION"],
-            button_color="#808080",
+            fg_color=self.theme["ENTRY_BG"],       # Track when OFF
+            progress_color=self.theme["BTN_ACTION"], # Track when ON
             button_hover_color=self.theme["BTN_HOVER"],
-            border_width=2,
-            border_color=self.theme["BORDER_DEFAULT"]
+            button_color=self.theme["BTN_ACTION"], # Start with OFF color
+            border_width=1,
+            button_length=8 # Slightly smaller than height (20) creates a 'inset' look
         )
         self.audio_switch.grid(row=4, column=0, sticky="w", padx=(88, 20), pady=(0, 20))
-        
+
+        # Force the switch to start OFF and match the 'OFF' theme color
+        self.audio_switch.deselect()
+        # self.audio_switch.configure(button_color=self.theme["BTN_ACTION"])
+
         # Progress Bar
         self.progress_bar = ctk.CTkProgressBar(
             self.content_frame,
@@ -213,58 +221,115 @@ class UIController:
             bg_color="transparent"
         )
         self.credit_label.place(x=20, rely=1.0, y=-5, anchor="sw")
+
+    def on_audio_switch_toggle(self):
+        # 1. Determine the mode once
+        is_dark = ctk.get_appearance_mode() == "Dark"
+
+        # 2. Assign the specific string based on that mode
+        if self.audio_switch.get() == 1:
+            t_color = "#1976d2"
+            h_color = "#448bd3"
+            p_color = "#1976d2"
+        else:
+            # OFF state: Grab the specific string from your theme tuple
+            # Index 1 is Dark, Index 0 is Light
+            t_color = self.theme["BTN_ACTION"][1 if is_dark else 0]
+            h_color = self.theme["BTN_HOVER"][1 if is_dark else 0]
+            p_color = self.theme["ENTRY_BG"][1 if is_dark else 0]
+
+        # 3. Configure using only single strings (No Tuples = No Crashes)
+        self.audio_switch.configure(
+            button_color=t_color,
+            button_hover_color=h_color,
+            progress_color=p_color
+        )
+
+        self.validate_inputs()
         
     def bind_events(self):
         # URL Entry Events
         self.url_entry.bind("<FocusIn>", lambda e: self.on_focus_in(self.url_entry))
         self.url_entry.bind("<FocusOut>", lambda e: self.on_focus_out(self.url_entry))
-        self.url_entry.bind("<Enter>", lambda e: self.url_entry.configure(border_color=self.theme["BORDER_HOVER"]))
+        self.url_entry.bind("<Enter>", lambda e: self.url_entry.configure(border_width=2, border_color=self.theme["BORDER_HOVER"]))
         self.url_entry.bind("<Leave>", lambda e: self.on_focus_out(self.url_entry))
+        self.url_entry.bind("<Return>", lambda e: self.on_download_button_click())
         self.url_entry.bind("<KeyRelease>", self.validate_inputs)
         
+
         # Folder Entry Events
         self.folder_entry.bind("<FocusIn>", lambda e: self.on_focus_in(self.folder_entry))
         self.folder_entry.bind("<FocusOut>", lambda e: self.on_focus_out(self.folder_entry))
-        self.folder_entry.bind("<Enter>", lambda e: self.folder_entry.configure(border_color=self.theme["BORDER_HOVER"]))
+        self.folder_entry.bind("<Enter>", lambda e: self.folder_entry.configure(border_width=2, border_color=self.theme["BORDER_HOVER"]))
         self.folder_entry.bind("<Leave>", lambda e: self.on_focus_out(self.folder_entry))
         self.folder_entry.bind("<KeyRelease>", self.validate_inputs)
-        
+
+        # Audio Switch Event
+        self.audio_switch.configure(command=self.on_audio_switch_toggle)
+
         # Download Button
-        self.download_btn.configure(command=lambda: self.on_download_button_click())
-        
+        self.download_btn.configure(command=self.on_download_button_click)
+
     def validate_inputs(self, event=None):
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
+        # Check if audio-only mode is active (1 = ON, 0 = OFF)
+        is_audio_only = self.audio_switch.get() == 1
+
+        # Determine the correct button text based on the switch
+        action_text = "Extract Audio" if is_audio_only else "Download Now"
 
         if url and folder and os.path.isdir(folder):
             if self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
                 self.download_btn.configure(
                     state="normal",
-                    text="Download Now",
+                    text=action_text, # Dynamically set based on switch
                     fg_color=self.theme["BTN_ACTION"],
                     hover_color=self.theme["BTN_HOVER"],
-                    text_color=self.theme["TEXT_ACTION"]
+                    text_color=self.theme["TEXT_ACTION_BTN"]
                 )
         elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
             self.download_btn.configure(
                 state="disabled",
                 text="Enter a URL & Location",
                 fg_color=self.theme["BTN_DISABLED"],
-                hover_color=self.theme["BTN_HOVER"],
                 text_color_disabled=self.theme["TEXT_DISABLED"]
             )
-        
+
     def on_focus_in(self, widget):
-        widget.configure(border_color=self.theme["ENTRY_FOCUS"])
-        widget.configure(text_color=(self.theme["TEXT_MAIN"]))
-        widget.configure(border_color=self.theme["ENTRY_FOCUS"])
+        # is_dark = ctk.get_appearance_mode() == "Dark"
+        # idx = 1 if is_dark else 0
+
+        # Check if the widget is an Entry field
+        if isinstance(widget, ctk.CTkEntry):
+            widget.configure(
+                border_color=self.theme["ENTRY_FOCUS"],
+                text_color=self.theme["TEXT_MAIN"] # Keep text readable
+            )
         
+        # Check if the widget is a Button
+        elif isinstance(widget, ctk.CTkButton):
+            widget.configure(
+                fg_color=self.theme["BTN_HOVER"][idx], # Light blue
+                text_color=self.theme["TEXT_ACTION_BTN"][idx] # Keep button text white
+            )
+
     def on_focus_out(self, widget):
-        if not widget.get().strip():
-            widget.configure(border_color=self.theme["BORDER_DEFAULT"])
-        else:
-            widget.configure(border_color=self.theme["BORDER_DEFAULT"])
-            widget.configure(text_color=self.theme["TEXT_MAIN"])
+        is_dark = ctk.get_appearance_mode() == "Dark"
+        idx = 1 if is_dark else 0
+
+        if isinstance(widget, ctk.CTkEntry):
+            # If entry is empty, use default border; if full, keep it clean
+            widget.configure(
+                border_color=self.theme["BORDER_DEFAULT"][idx],
+                text_color=self.theme["TEXT_MAIN"][idx]
+            )
+        
+        elif isinstance(widget, ctk.CTkButton):
+            widget.configure(
+                fg_color=self.theme["BTN_ACTION"][idx], # Darker blue
+                text_color=self.theme["TEXT_ACTION_BTN"][idx]
+            )
     
     def select_folder(self):
         if folder := filedialog.askdirectory():
@@ -282,42 +347,72 @@ class UIController:
             self.url_entry.delete(0, "end")
             self.url_entry.insert(0, text)
             self.validate_inputs()
-            
+
     def on_download_button_click(self):
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
 
-        # NEW: validate the URL before starting the download
         if url and folder and os.path.isdir(folder):
             try:
-                # yt‑dlp will raise an exception if the URL is bad
-                YoutubeDL({'quiet': True}).extract_info(url, download=False)
+                # Check the URL first
+                with YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+                    ydl.extract_info(url, download=False)
+                    
             except Exception as e:
-                # Show an ERROR popup and stop
-                self.show_popup("Error", False, str(e))
-                return
-        # ────────────
+                # This is where the magic happens:
+                # We catch the error and pass a clean message to your popup
+                error_msg = "The URL you entered is invalid or not supported."
+                print(f"Validation Error: {e}") # Keep the technical error in console
+                
+                # Make sure to call this on the main thread just in case
+                self.root.after(0, lambda: self.show_popup("Invalid URL", False, error_msg))
+                return 
 
-        if url and folder and os.path.isdir(folder):
+            # If we get here, the URL is valid, start the download
             self.lock_ui("Downloading...")
             self.download_manager.set_progress_hook(self.download_progress_hook)
 
-            # Run the download in a background thread so the UI stays responsive
             t = threading.Thread(
-                target=self._download_thread,
+                target=self.download_thread,
                 args=(url, folder, is_audio),
                 daemon=True
             )
             t.start()
-        elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
-            self.download_btn.configure(
-                state="disabled",
-                text="Enter a URL & Location",
-                fg_color=self.theme["BTN_DISABLED"],
-                hover_color=self.theme["BTN_HOVER"],
-                text_color_disabled=self.theme["TEXT_DISABLED"]
-            )
+    # def on_download_button_click(self):
+    #     url = self.url_entry.get().strip()
+    #     folder = self.folder_entry.get().strip()
+    #     is_audio = self.audio_switch.get()
+
+    #     # NEW: validate the URL before starting the download
+    #     if url and folder and os.path.isdir(folder):
+    #         try:
+    #             # yt‑dlp will raise an exception if the URL is bad
+    #             YoutubeDL({'quiet': True}).extract_info(url, download=False)
+    #         except Exception as e:
+    #             # Show an ERROR popup and stop
+    #             self.show_popup("Error", False, str(e))
+    #             return
+    #     # ────────────
+
+    #     if url and folder and os.path.isdir(folder):
+    #         self.lock_ui("Downloading...")
+    #         self.download_manager.set_progress_hook(self.download_progress_hook)
+
+    #         # Run the download in a background thread so the UI stays responsive
+    #         t = threading.Thread(
+    #             target=self.download_thread,
+    #             args=(url, folder, is_audio),
+    #             daemon=True
+    #         )
+    #         t.start()
+    #     elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
+    #         self.download_btn.configure(
+    #             state="disabled",
+    #             text="Enter a URL & Location",
+    #             fg_color=self.theme["BTN_DISABLED"],
+    #             text_color_disabled=self.theme["TEXT_DISABLED"]
+    #         )
     
     def download_progress_hook(self, progress):
         """
@@ -332,6 +427,7 @@ class UIController:
         phase = ProgressParser.detect_phase(info_str)
         
         if phase == "MERGING":
+            self.progress_bar.configure(mode="indeterminate")
             self.progress_bar.set(0.5)  # Indeterminate bounce (use fixed intermediate value)
             self.download_btn.configure(
                 state="disabled",
@@ -343,7 +439,7 @@ class UIController:
             self.progress_bar.set(progress / 100)
         
     # New helper method to run the download in a background thread
-    def _download_thread(self, url: str, folder: str, is_audio: bool):
+    def download_thread(self, url: str, folder: str, is_audio: bool):
         try:
             success = self.download_manager.download_media(url, folder, is_audio)
             # Schedule the completion callback on the main thread
@@ -391,14 +487,10 @@ class UIController:
             fg_color=self.theme["BTN_ACTION"],
             hover_color=self.theme["BTN_HOVER"]
         )
-        
-        self.audio_switch.configure(
-            state="normal",
-            progress_color=self.theme["BTN_ACTION"],
-            fg_color=self.theme["ENTRY_BG"],
-            button_color=self.theme["BTN_ACTION"],
-            border_color=self.theme["BORDER_DEFAULT"]
-        )
+        self.audio_switch.configure(state="normal")
+
+        # Call the toggle function to restore the correct colors based on current state
+        self.on_audio_switch_toggle()
         
         self.download_btn.configure(
             text="Enter a URL & Location",
@@ -412,29 +504,28 @@ class UIController:
         self.validate_inputs()
     
     def show_popup(self, title: str, success: bool, error_detail: Optional[str] = None):
-        """Show a popup dialog for download completion/failure or error."""
         popup = ctk.CTkToplevel(self.root)
-        popup.resizable(True, True)
-        popup.title(title)          # use the supplied title
         
-        popup.grab_set()  # Make the popup modal
+        # 1. Pick a safe string from your theme
+        bg_color = self.theme["APP_BG"]
+        text_color = self.theme["TEXT_MAIN"]
+
+        # 2. Configure the window background
+        popup.configure(fg_color=bg_color)
+        popup.title(title)
+        popup.geometry("400x200")
+        popup.resizable(False, False)
+        # Optional: Force the window to stay on top
+        popup.attributes("-topmost", True)
         
-        width, height = 350, 140
-        center_x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (width // 2)
-        center_y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{center_x}+{center_y}")
-        
-        # Main message – use the title
+        # 3. Ensure labels inside use the correct text color so they don't disappear
         label = ctk.CTkLabel(
             popup,
-            text=title,
             wraplength=300,
             font=self.main_font,
-            text_color=self.theme["TEXT_MAIN"]
+            text_color=text_color  # Explicitly set this!
         )
         label.pack(expand=True, pady=(20, 10))
-        
-        # Error details removed - only show title and close button
         
         btn = ctk.CTkButton(
             popup,
@@ -445,14 +536,14 @@ class UIController:
             corner_radius=25,
             fg_color=self.theme["BTN_ACTION"],
             hover_color=self.theme["BTN_HOVER"],
-            text_color=self.theme["TEXT_ACTION"],
+            text_color=self.theme["TEXT_ACTION_BTN"],
             command=lambda: (popup.grab_release(), popup.destroy())
         )
         btn.pack(pady=(0, 20))
 
     def get_build_info(self):                                                                                 
         """Combines Version Number and Git Commit for the UI."""                                              
-        version = "v0.2.1"  # Manually update this here for each release                                      
+        version = "v0.2.2"  # Manually update this here for each release                                      
         try:                                                                                                  
             base_path = os.path.dirname(os.path.abspath(__file__))                                            
             commit_file_path = os.path.join(base_path, 'assets', 'commit.txt')                                
