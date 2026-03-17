@@ -242,7 +242,7 @@ class DownloadWorker:
 
                     # Update status text in UI
                     if status_text and hasattr(self.app, 'update_status_hook'):
-                        self.app.root.after(0, lambda s=status_text: self.app.update_status_hook(s))
+                        self.app.after(0, lambda s=status_text: self.app.update_status_hook(s))
 
                     if progress_match := re.search(
                         r"(?:\(| )(\d+(?:\.\d+)?)%", clean_line
@@ -252,7 +252,7 @@ class DownloadWorker:
                                 percent = float(progress_match[1])
                                 normalized_progress = percent / 100.0
 
-                                self.app.root.after(0, lambda p=normalized_progress: self.app.progress_hook(p))
+                                self.app.after(0, lambda p=normalized_progress: self.app.progress_hook(p))
             return self.current_process.returncode == 0
 
         except Exception as e:

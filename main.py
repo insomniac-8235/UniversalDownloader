@@ -29,7 +29,7 @@ setup_env()
 from ui.controller import UIController
 from download_queue.thread_pool import ThreadPoolManager
 from worker.download_worker import DownloadWorker
-from utils.logger import UDLogger, DEBUG 
+from utils.logger import UDLogger, DEBUG
 from utils.theme import THEME
 from utils.paths import _path_cache, get_yt_dlp_path
 
@@ -42,7 +42,7 @@ class UniversalDownloader(ctk.CTk):
         self.title("Universal Downloader")
 
         # Logger First
-        self.logger = UDLogger(level=10)
+        self.logger = UDLogger(level=DEBUG)
         _path_cache.set_logger(self.logger)
 
         # Setup Worker (Inject Logger, but don't pass controller yet)
@@ -58,12 +58,9 @@ class UniversalDownloader(ctk.CTk):
         self.worker.set_progress_hook(self.controller.on_progress_update)
 
         # Initialize Queue manager
-        self.queue_manager = ThreadPoolManager(
-            worker=self.worker,
-            max_workers=4,
-            controller=self.controller
-        )
-
+        self.queue_manager = ThreadPoolManager(self, self.worker, max_workers=4)
+        self.queue_manager.start()
+        
         # UI and Dynamic scaling
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()

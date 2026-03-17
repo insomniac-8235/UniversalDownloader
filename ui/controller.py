@@ -199,7 +199,7 @@ class UIController:
             font=self.button_font,
             fg_color=self.theme["BTN_DISABLED"],
             text_color_disabled=self.theme["TEXT_DISABLED"],
-            command=self.initiate_download
+            command=self.toggle_download
         )
         self.download_btn.grid(row=6, column=0, sticky="s")
         
@@ -250,21 +250,12 @@ class UIController:
             fg_color="#e67e22"  # A distinct 'processing' orange
         )
 
-    def initiate_download(self):
-        # 1. Grab values from your UI entry fields
-        url = self.url_entry.get()
-        folder = self.folder_entry.get()
-        is_audio = self.audio_switch.get()
+        # 3. Lock the UI (turns the button into a "Cancel" or "Downloading..." state)
+        self.set_downloading_state(True)
 
-        # 2. Reset the progress bar for a clean start
-        self.progress_bar.set(0)
-
-        self.app.worker.start_download_threaded(
-            url, 
-            folder, 
-            is_audio, 
-            self.progress_bar.set  # This is the 'progress_hook'
-)
+        # 4. The Magic Link: Send it to the Thread Pool via the App Hub
+        self.app.logger.info(f"UI sending task to queue: {url}")
+        self.app.queue_manager.enqueue(url, folder, is_audio, use_ffmpeg)
 
     def download_success(self, task_info):
             """Handle successful download"""
@@ -277,31 +268,26 @@ class UIController:
         messagebox.showerror("Download Error", message)      
 
     def toggle_download(self):
-        print("UI DEBUG: Download button clicked!")
-        if self.downloading:
+        self.app.logger.info("UI: Download button clicked!")
+        
+        if getattr(self, 'downloading', False):
             self.app.worker.cancel()
             return
 
         url = self.url_entry.get().strip()
-        folder = self.folder_entry.get().strip()
+        
+        # Make sure this variable name matches what you actually use for the folder!
+        # Sometimes it's self.folder_path, sometimes self.folder_entry.get()
+        folder = getattr(self, 'folder_path', "") 
         is_audio = self.audio_switch.get()
 
         if not url or not folder:
-            self.on_invalid_url("Please provide both a URL and a download location.")
+            self.app.logger.warning("Missing URL or Folder")
             return
 
-    # def set_downloading_state(self, is_downloading):
-    #     if is_downloading:
-    #         self.download_btn.configure(text="Cancel", fg_color="#c0392b")
-    #         # Start the bouncing animation
-    #         self.progress_bar.configure(mode="indeterminate")
-    #         self.progress_bar.start()
-    #     else:
-    #         # Stop animation and reset
-    #         self.progress_bar.stop()
-    #         self.progress_bar.configure(mode="determinate")
-    #         self.progress_bar.set(0)
-    #         self.download_btn.configure(text="Download", fg_color=["#197cd2", "#197cd2"])
+        # --- YOU MUST HAVE THESE TWO LINES ---
+        self.set_downloading_state(True)
+        self.app.queue_manager.enqueue(url, folder, is_audio)
 
     def on_invalid_url(self, error_msg: str):
         """Handle invalid URL errors"""
@@ -467,7 +453,7 @@ class UIController:
 
         # Schedule the NEXT frame (50ms = 20fps)
         if new_val < 1.0:
-            self.app.after(50, self.root.animate_progress) 
+            self.app.after(50, self.app.animate_progress) 
 
     def cancel_download(self):
         self.app.worker.cancel()
