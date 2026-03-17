@@ -3,26 +3,23 @@ import time
 import platform
 import os
 import subprocess
-from queue import Empty, Queue
+from urllib.parse import urlparse
+from queue import Empty
 from download_queue.download_queue import DownloadQueue
-from utils.logger import MyLogger, DEBUG
+from utils.logger import UDLogger, DEBUG
+print(f"--- LOADING MODULE: {__name__} ---")
 
 class ThreadPoolManager:
     def __init__(self, worker, max_workers=4, controller=None): 
         self.queue = DownloadQueue(worker=worker, max_size=0)
         self.max_workers = max_workers
-        self.logger = MyLogger(level=DEBUG)
+        self.logger = UDLogger(level=DEBUG)
         self._thread_pool = []
         self._shutdown_event = threading.Event()
-        self.metrics = {
-            'downloads_completed': 0,
-            'downloads_failed': 0,
-            'total_time': 0,
-            'avg_download_speed': 0
-        }
         self.controller = controller
         if self.controller:
             self.queue.worker.set_progress_hook(self.controller.on_progress_update)
+
     def start(self):
         """Initializes and starts the worker thread pool."""
         if self._thread_pool:
@@ -52,35 +49,39 @@ class ThreadPoolManager:
                             success = self.run_with_ffmpeg(task)
                         else:
                             success = self.queue.execute_task(task)
-                        end_time = time.time()
-                        download_time = end_time - start_time
-                        download_speed = (len(task['url']) / 1024) / download_time if download_time > 0 else 0
-                        self.metrics['total_time'] += download_time
-                        self.metrics['avg_download_speed'] += download_speed
                         self.notify_completion(task)
                     except Exception as e:
                         self.logger.error(f"Worker {worker_id} error: {e}")
-                        self.metrics['downloads_failed'] += 1
                         self.notify_error(task, str(e))
             except Empty:
                 continue
             except Exception as e:
-                self.logger.critical(f"Critical worker failure: {e}", exc_info=True)
+                self.logger.error(f"Critical worker failure: {e}", exc_info=True)
                 self.stop()  # Stop the thread pool if a critical error occurs
+
     def run_with_ffmpeg(self, task):
         """Run the task using FFmpeg"""
+        filename = os.path.basename(urlparse(task['url']).path)
+        output_file = os.path.join(task['folder'], f"{filename}.mp4")
+
         command = [
             'ffmpeg',
             '-i', task['url'],
-            os.path.join(task['folder'], f"{os.path.basename(task['url'])}.mp4")  # Example output file
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-y',  # overwrite output if exists
+            output_file
         ]
         
         try:
-            result = subprocess.run(command, check=True)
+            result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.logger.info(result.stdout)
+            self.logger.warning(result.stderr)
             return True
-        except Exception as e:
-            self.logger.error(f"Error running FFmpeg: {e}")
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"FFmpeg failed: {e.stderr}")
             return False
+        
     def notify_completion(self, task):
         """Handles post-download logic and UI notification."""
         self.logger.info(f"✅ Task Completed: {task}")
@@ -92,18 +93,46 @@ class ThreadPoolManager:
                 task['is_audio']
             )
     def notify_error(self, task, error_msg):
-        """Handles failure logic and UI notification."""
-        self.logger.error(f"Task Failed: {task} | Error: {error_msg}")
+        """Ensures the UI knows the task is dead, even if the worker failed to report it."""
+        self.logger.error(f"Queue Error: {error_msg}")
+        
         if self.controller:
-            self.controller.on_download_error(task['url'], task['folder'], error_msg)
+            # 1. Update the UI Log/Toast
+            self.controller.on_download_error(task.get('url'), task.get('folder'), error_msg)
+            
+            # 2. IMPORTANT: Reset the button so the user can try again!
+            self.controller.root.after(0, lambda: self.controller.set_downloading_state(False))
+
+    def enqueue(self, url, folder, is_audio, use_ffmpeg=False):
+        """Packages UI data into a task dict and sends it to the queue."""
+        task = {
+            'url': url,
+            'folder': folder,
+            'is_audio': is_audio,
+            'use_ffmpeg': use_ffmpeg
+        }
+        self.logger.info(f"Task prepared for {url}")
+        # This calls the enqueue method on your DownloadQueue instance
+        self.queue.enqueue(task)
+    
+    def _task_complete_callback(self, future):
+        """Internal callback for the ThreadPoolExecutor."""
+        try:
+            result = future.result() 
+        except Exception as e:
+            # This is where notify_error saves the day
+            self.notify_error(self.current_task, str(e))
 
     def stop(self):
-        """Graceful shutdown with Cross-Platform Cleanup"""
+        """Initiating universal shutdown..."""
         self._shutdown_event.set()
-        self.logger.info("Initiating universal shutdown...")
-        # 1. Kill subprocesses based on OS (The Enforcer Layer)
-        self.kill_binaries()
-        # 2. Wait for threads to finish
+        self.logger.info("Stopping all workers...")
+
+        # 1. Tell the worker to stop its specific active process
+        if hasattr(self.queue, 'worker'):
+            self.queue.worker.cancel()
+
+        # 2. Wait for threads to finish gracefully
         timeout = 10  # Reduced for better UX
         start_time = time.time()
         while [
@@ -119,7 +148,7 @@ class ThreadPoolManager:
         binaries = ["ffmpeg", "aria2c", "deno", "yt-dlp"]
         for bin_name in binaries:
             try:
-                if current_os == "Windows":
+                if current_os == "nt":
                     # Windows: use taskkill with /T (tree) to catch child processes
                     subprocess.run(
                         ['taskkill', '/F', '/IM', f"{bin_name}.exe", '/T'],
@@ -133,24 +162,3 @@ class ThreadPoolManager:
                     )
             except Exception as e:
                 self.logger.debug(f"Could not kill {bin_name}: {e}")
-
-    def enqueue(self, url, folder, is_audio, use_ffmpeg=False):
-        """Packages UI data into a task dict and sends it to the queue."""
-        task = {
-            'url': url,
-            'folder': folder,
-            'is_audio': is_audio,
-            'use_ffmpeg': use_ffmpeg
-        }
-        self.logger.info(f"Task prepared for {url}")
-        # This calls the enqueue method on your DownloadQueue instance
-        self.queue.enqueue(task)
-
-    def get_metrics(self):
-        """Returns the current metrics."""
-        return {
-            'downloads_completed': self.metrics['downloads_completed'],
-            'downloads_failed': self.metrics['downloads_failed'],
-            'total_time': self.metrics['total_time'],
-            'avg_download_speed': self.metrics['avg_download_speed']
-        }

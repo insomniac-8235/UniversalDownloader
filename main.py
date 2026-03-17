@@ -3,11 +3,12 @@ import sys
 import platform
 import customtkinter as ctk
 from PIL import Image, ImageTk
+print(f"--- LOADING MODULE: {__name__} ---")
 
 # --- 1. THE BUNDLE GATEKEEPER ---
 # Logic to find the true root whether running locally or as a bundle
 if hasattr(sys, '_MEIPASS'):
-    BASE_DIR = sys._MEIPASS
+    BASE_DIR = sys._MEIPASS # type: ignore
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,50 +29,52 @@ setup_env()
 from ui.controller import UIController
 from download_queue.thread_pool import ThreadPoolManager
 from worker.download_worker import DownloadWorker
-from utils.logger import MyLogger, DEBUG 
+from utils.logger import UDLogger, DEBUG 
 from utils.theme import THEME
+from utils.paths import _path_cache, get_yt_dlp_path
+
 
 class UniversalDownloader(ctk.CTk):
     def __init__(self):
         super().__init__()
-
         ctk.set_appearance_mode("system")
         self.configure(bg=THEME["APP_BG"])
         self.title("Universal Downloader")
 
-        # Dynamic scaling
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        width = int(screen_width * 0.2)
-        height = int(screen_height * 0.3)
-        self.geometry(f"{width}x{height}")
-        self.minsize(500, 500)
+        # Logger First
+        self.logger = UDLogger(level=10)
+        _path_cache.set_logger(self.logger)
 
-        # Logger
-        self.logger = MyLogger(level=DEBUG)
+        # Setup Worker (Inject Logger, but don't pass controller yet)
+        # Pass 'self' (the app) as the bridge instead of a specific controller class
+        self.worker = DownloadWorker(self, self.logger)
 
-        # Icon & binary checks
-        self.setup_icons()
-        self.check_binary_integrity()
+        # Setup UI Controller
+        # Pass 'self' so the controller can access self.worker later
+        self.controller = UIController(self)
 
-        # --- CORE STACK ---
-        # 1. Worker
-        self.worker = DownloadWorker(self.logger)
+        # Connect the dots (Wiring)
+        # Now that both exist, link the worker's hooks to the controller's methods
+        self.worker.set_progress_hook(self.controller.on_progress_update)
 
-        # 2. Controller (pass worker so it can start/cancel downloads)
-        self.controller = UIController(self, worker=self.worker)
-
-        # 3. Queue manager
+        # Initialize Queue manager
         self.queue_manager = ThreadPoolManager(
             worker=self.worker,
             max_workers=4,
             controller=self.controller
         )
-        self.controller.queue = self.queue_manager
-        self.queue_manager.start()
 
-        # Hook worker progress to UIController
-        self.worker.set_progress_hook(self.controller.on_worker_progress)
+        # UI and Dynamic scaling
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        width = int(screen_width * 0.15)
+        height = int(screen_height * 0.3)
+        self.geometry(f"{width}x{height}")
+        self.minsize(500,400)
+
+        # Icon & binary checks
+        self.setup_icons()
+        self.check_binary_integrity()
 
     def load_metadata(self):
         """Pulls the version and commit baked in during the build."""
@@ -116,7 +119,6 @@ class UniversalDownloader(ctk.CTk):
                 self.logger.warning(f"{tool} not found in PATH. Downloads may fail.")
 
     def on_closing(self):
-        """The Master Janitor sequence."""
         self.logger.info("Closing the application...")
         if hasattr(self, 'queue_manager'):
             self.queue_manager.stop()

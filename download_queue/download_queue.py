@@ -1,6 +1,7 @@
 from queue import Queue
 from worker import DownloadWorker
 from typing import Dict, Any
+print(f"--- LOADING MODULE: {__name__} ---")
 
 class DownloadQueue:
     def __init__(self, worker: DownloadWorker, max_size=0):
@@ -23,7 +24,7 @@ class DownloadQueue:
             folder = task['folder']
             is_audio = task['is_audio']
 
-            return self.worker.download(url, folder, is_audio)
+            return self.worker.execute_download(url, folder, is_audio)
         except KeyError as e:
             # Log missing key in task
             self.worker.logger.error(f"Task missing required key: {e}", exc_info=True)
@@ -34,9 +35,9 @@ class DownloadQueue:
             return False
 
     def size(self) -> int:
-        """Return the current size of the queue."""
+        # Return the current size of the queue.
         return self._queue.qsize()
 
     def is_empty(self) -> bool:
-        """Return True if the queue is empty, False otherwise."""
+        # Return True if the queue is empty, False otherwise.
         return self._queue.empty()
