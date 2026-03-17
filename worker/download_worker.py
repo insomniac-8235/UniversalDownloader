@@ -12,6 +12,7 @@ print(f"--- LOADING MODULE: {__name__} ---")
 
 
 class DownloadWorker:
+    print("WORKER DEBUG: Thread starting...") # <--- PING 2
     def __init__(self, app, logger):
         super().__init__()
         self.app = app
@@ -33,9 +34,8 @@ class DownloadWorker:
             self.progress_hook(d)
 
     # --------------------- Threaded download --------------------- #
-    # Inside DownloadWorker
     def start_download_threaded(self, url, folder, is_audio, progress_hook):
-        print("WORKER DEBUG: Thread starting...") # <--- PING 2
+        
         t = threading.Thread(
             target=self.run_worker,
             args=(url, folder, is_audio), 
@@ -46,16 +46,24 @@ class DownloadWorker:
     def run_worker(self, url, folder, is_audio):
         self.logger.info("WORKER DEBUG: Inside run_worker thread")
         try:
-            # 1. TELL UI WE STARTED
-            self.app.after(0, lambda: self.app.set_downloading_state(True))
-            
-            self.execute_download(url, folder, is_audio)
-            
+            # 1. Start the UI downloading state
+            self.app.after(0, lambda: self.app.controller.set_downloading_state(True))
+
+            # 2. Run the actual process
+            success = self.execute_download(url, folder, is_audio)
+
+            if success:
+                self.logger.info("✅ Download and Processing Complete.")
+            else:
+                self.logger.error("❌ Download failed or was cancelled.")
+
         except Exception as e:
-            self.logger.error(f"Download Error: {e}")
+            self.logger.error(f"Worker Error: {e}")
+        
         finally:
-            # 2. TELL UI WE FINISHED
-            self.app.after(0, lambda: self.app.set_downloading_state(False))
+            # 3. CRITICAL: Always reset the UI, even if it crashed!
+            self.app.after(0, lambda: self.app.controller.set_downloading_state(False))
+
 
     # --------------------- URL Validation --------------------- #
     def is_valid_url(self, url: str) -> bool:
@@ -182,28 +190,31 @@ class DownloadWorker:
         self.cancel_event.set()
         self._stop_subprocess() # Cleaned up
 
-
     def execute_download(self, url, folder, is_audio):
-        # 1. Initialize variables to avoid UnboundLocalError
-        cmd = []
+        """
+        Launches the Deno process and streams output character-by-character 
+        to ensure real-time UI updates and progress tracking.
+        """
+        # 1. Initialize process state
         self.current_process = None
+        cmd = []
 
         try:
-            # 2. Gather paths
+            # 2. Gather paths from your utility functions
             deno_path = get_deno_path()
             service_script = get_deno_service_path()
             ytdlp_path = get_yt_dlp_path()
             aria_path = get_aria2c_path()
 
-            # 3. Build the Command list
+            # 3. Build the Command
             cmd = [
                 deno_path, "run", "-A", service_script,
                 url, folder, str(is_audio).lower(), ytdlp_path, aria_path
             ]
 
-            print(f"DEBUG: Launching Process -> {' '.join(cmd)}", flush=True)
+            self.logger.debug(f"Launching Deno Process: {' '.join(cmd)}")
 
-            # 4. Spawn the subprocess
+            # 4. Spawn the subprocess with line buffering
             self.current_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -213,48 +224,134 @@ class DownloadWorker:
                 universal_newlines=True
             )
 
-            while self.current_process is not None:
-                line = self.current_process.stdout.readline()
-
-                # Check if process is still running
-                is_alive = self.current_process.poll() is None
-                if not line and not is_alive:
+            # --- THE FIREHOSE LOOP ---
+            # We read character-by-character to catch \r updates (aria2c style)
+            partial_line = ""
+            while True:
+                char = self.current_process.stdout.read(1)
+                
+                # Exit condition: no more output and process has exited
+                if not char and self.current_process.poll() is not None:
                     break
+                
+                if char:
+                    if char in ('\n', '\r'):
+                        # We hit a line break or carriage return
+                        clean_line = partial_line.strip()
+                        if clean_line:
+                            # Log to console for debugging
+                            self.logger.debug(f"DENO: {clean_line}")
+                            # Pass to the parser for UI updates
+                            self._handle_worker_output(clean_line)
+                        
+                        partial_line = "" # Reset buffer for next line
+                    else:
+                        partial_line += char
 
-                if line:
-                    clean_line = line.strip()
-                    print(f"DENO_VERBOSE: {clean_line}", flush=True)
-
-                    # --- VERBOSE STATUS LOGIC ---
-                    status_text = None
-                    if "[youtube]" in clean_line:
-                        status_text = "Analyzing YouTube..."
-                    elif "[info]" in clean_line:
-                        status_text = "Gathering Formats..."
-                    elif "[download] Destination" in clean_line:
-                        status_text = "Starting Download..."
-                    elif "[download]" in clean_line and "%" not in clean_line:
-                        status_text = "Downloading Fragments..."
-                    elif "[Merger]" in clean_line:
-                        status_text = "Merging Files..."
-                    elif "DRM protected" in clean_line:
-                        status_text = "ERROR: DRM Protected"
-
-                    # Update status text in UI
-                    if status_text and hasattr(self.app, 'update_status_hook'):
-                        self.app.after(0, lambda s=status_text: self.app.update_status_hook(s))
-
-                    if progress_match := re.search(
-                        r"(?:\(| )(\d+(?:\.\d+)?)%", clean_line
-                    ):
-                        with contextlib.suppress(ValueError):
-                            if self.progress_hook:
-                                percent = float(progress_match[1])
-                                normalized_progress = percent / 100.0
-
-                                self.app.after(0, lambda p=normalized_progress: self.app.progress_hook(p))
             return self.current_process.returncode == 0
 
         except Exception as e:
-            print(f"FATAL ERROR in execute_download: {e}", flush=True)
+            self.logger.error(f"DENO: FATAL ERROR in execute_download: {e}")
             return False
+
+    def _handle_worker_output(self, clean_line):
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        decolorized = ansi_escape.sub('', clean_line)
+
+        # --- 1. EXTRACT SPEED ---
+        if "DL:" in decolorized:
+            # Matches numbers like 25.5 and units like MiB or KiB
+            if speed_match := re.search(r"DL:(\d+(?:\.\d+)?)([KkMmGg]iB)", decolorized):
+                num = speed_match[1]
+                # Convert 'MiB' to 'MB' for a cleaner look
+                unit = speed_match[2].replace('iB', 'B') 
+                speed_str = f"{num}{unit}/s"
+                
+                if hasattr(self.app.controller, 'update_speed_hook'):
+                    self.app.after(0, lambda: self.app.controller.update_speed_hook(speed_str))
+
+        # --- 2. THE BOUNCER (Silence the noise) ---
+        trash = ["[NOTICE]", "Summary", "====", "----", "FILE:", "[#"]
+        if any(m in decolorized for m in trash):
+            if "%" in decolorized: self._parse_and_update_progress(decolorized)
+            return 
+
+        # --- 3. LOGGING & STATUS ---
+        self.logger.debug(f"DENO: {decolorized}")
+        self._update_status_labels(decolorized)
+
+    def _update_status_labels(self, text):
+        """Helper to update the 'Analyzing/Merging' label."""
+        status = None
+        if "[youtube]" in text: status = "Analyzing YouTube..."
+        elif "[info]" in text: status = "Gathering Formats..."
+        elif "[Merger]" in text or "ffmpeg" in text.lower():
+            status = "Merging Files..."
+            if hasattr(self.app.controller, 'set_processing_state'):
+                self.app.after(0, self.app.controller.set_processing_state)
+
+        if status and hasattr(self.app.controller, 'update_status_hook'):
+            self.app.after(0, lambda s=status: self.app.controller.update_status_hook(s))
+
+    def _handle_worker_output(self, clean_line):
+        """The Bouncer: Updates UI and silences the Aria2c summary flood."""
+        # 1. Strip ANSI colors
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        decolorized = ansi_escape.sub('', clean_line)
+
+        # --- 2. SPEED SNIFFER ---
+        # Look for the speed (e.g., DL:15MiB)
+        if "DL:" in decolorized:
+            if speed_match := re.search(r"DL:(\d+(?:\.\d+)?)([KkMmGg]iB)", decolorized):
+                num = speed_match[1]
+                unit = speed_match[2].replace('iB', 'B') # MiB -> MB
+                speed_str = f"{num}{unit}/s"
+                
+                # Push speed to the Controller
+                if hasattr(self.app.controller, 'update_speed_hook'):
+                    self.app.after(0, lambda: self.app.controller.update_speed_hook(speed_str))
+
+        # --- 3. THE TRASH FILTER ---
+        # If it's aria2c fragment spam, we check for progress and then KILL the line
+        trash = ["[NOTICE]", "Summary", "====", "----", "FILE:", "[#"]
+        if any(marker in decolorized for marker in trash):
+            if "%" in decolorized: 
+                self._parse_and_update_progress(decolorized)
+            return 
+
+        # --- 4. PROGRESS CHECK ---
+        if "%" in decolorized:
+            self._parse_and_update_progress(decolorized)
+            # If it's a standard download line, don't log it to keep the console clean
+            if "[download]" in decolorized:
+                return
+
+        # --- 5. LOG THE IMPORTANT STUFF ---
+        # Only major events (Analyzing, Merging, Errors) reach the console
+        self.logger.debug(f"DENO: {decolorized}")
+        self._update_status_labels(decolorized)
+
+    # --- THE MISSING HELPER FUNCTIONS ---
+
+    def _parse_and_update_progress(self, text):
+        """Extracts % from any string and updates the UI progress bar."""
+        if match := re.search(r"(\d+(?:\.\d+)?)%", text):
+            try:
+                # Convert 45.2 to 0.452 for the CTkProgressBar
+                val = float(match[1]) / 100.0
+                self.app.after(0, lambda: self.app.controller.on_progress_update(val))
+            except Exception:
+                pass
+
+    def _update_status_labels(self, text):
+        """Updates the internal state of the status label (Analyzing/Merging)."""
+        status = None
+        if "[youtube]" in text: status = "Analyzing YouTube..."
+        elif "[info]" in text: status = "Gathering Formats..."
+        elif "[Merger]" in text or "ffmpeg" in text.lower():
+            status = "Merging Files..."
+            if hasattr(self.app.controller, 'set_processing_state'):
+                self.app.after(0, self.app.controller.set_processing_state)
+
+        if status and hasattr(self.app.controller, 'update_status_hook'):
+            self.app.after(0, lambda s=status: self.app.controller.update_status_hook(s))

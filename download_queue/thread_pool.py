@@ -94,7 +94,7 @@ class ThreadPoolManager:
         self.logger.info(f"✅ Task Completed: {task['url']}")
         if self.controller:
             # Use app.after to safely update the UI from this background thread
-            self.app.after(0, lambda: self.controller.on_download_complete(
+            self.app.after(0, lambda: self.app.controller.on_download_complete(
                 task['url'], 
                 task['folder'], 
                 task['is_audio']
@@ -106,10 +106,10 @@ class ThreadPoolManager:
         
         if self.controller:
             # 3. Fixed the UI update to use the correct app and controller methods
-            self.app.after(0, lambda: self.controller.on_download_error(
+            self.app.after(0, lambda: self.app.controller.on_download_error(
                 task.get('url'), task.get('folder'), error_msg
             ))
-            self.app.after(0, lambda: self.controller.set_downloading_state(False))
+            self.app.after(0, lambda: self.app.controller.set_downloading_state(False))
 
     def enqueue(self, url, folder, is_audio, use_ffmpeg=False):
         """Packages UI data into a task dict and sends it to the queue."""

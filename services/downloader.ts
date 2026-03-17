@@ -12,14 +12,19 @@ if (!url || !folder) {
   Deno.exit(1);
 }
 
+
 // 1. Build arguments for yt-dlp
 const args = [
   url,
   "-P", folder,
   "--newline",
-  "--progress",
+  "--progress",              // This is okay here (it's for yt-dlp)
   "--no-warnings",
-  "--remote-components", "ejs:github", // Fixes the JS challenge warning
+  // Fix the aria2c arguments below:
+  "--progress-template", "[download] %(progress._percent_str)s", 
+  "--external-downloader-args", "aria2c:--summary-interval=1 --console-log-level=notice", 
+  // ^^^ Removed --progress from the line above ^^^
+  "--remote-components", "ejs:github",
   "--external-downloader", ariaPath,
 ];
 

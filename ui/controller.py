@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import Tk, filedialog, messagebox
 import os
 import sys
+import re
 from utils.theme import THEME, FONTS
 print(f"--- LOADING MODULE: {__name__} ---")
 
@@ -78,6 +79,7 @@ class UIController:
             text_color=self.theme["TEXT_MAIN"],
             placeholder_text_color=self.theme["TEXT_GHOST"],
             border_width=1,
+            border_color=self.theme["BORDER_DEFAULT"]
         )
         self.url_entry.grid(row=0, column=0, sticky="we")
         
@@ -179,15 +181,6 @@ class UIController:
         self.progress_bar.set(0)
         self.progress_bar.grid(row=5, column=0, columnspan=2, sticky="we", pady=(0, 20))
         
-        # self.download_card = ctk.CTkFrame(
-        #     self.content_frame,
-        #     corner_radius=16,
-        #     fg_color=self.theme["ENTRY_BG"]
-        # )
-
-        # self.download_card.grid(row=6, column=0, columnspan=2, sticky="we", pady=(10,20))
-        # self.download_card.grid_columnconfigure(0, weight=1)
-
         # Download Button
         self.download_btn = ctk.CTkButton(
             self.content_frame,
@@ -229,33 +222,145 @@ class UIController:
         self.folder_entry.bind("<Leave>", lambda e: self.on_focus_out(self.folder_entry))
         self.folder_entry.bind("<KeyRelease>", self.debounced_validate_inputs)
 
-    def set_downloading_state(self, is_downloading):
-        if is_downloading:
-            # We only update the button because status_label doesn't exist
-            self.download_btn.configure(text="Cancel", fg_color="#c0392b")
+        # Download button Hover Events
+        self.download_btn.bind("<Enter>", self._on_download_btn_hover)
+        self.download_btn.bind("<Leave>", self._on_download_btn_leave)
+
+    def on_focus_in(self, widget):
+        if self.downloading:
+            return  # ignore focus changes while downloading
+        if widget in [self.url_entry, self.folder_entry]:
+            widget.configure(border_color=self.theme["BORDER_FOCUS"])
+            widget.configure(text_color=self.theme["TEXT_MAIN"])
+
+    def on_focus_out(self, widget):
+        if self.downloading:
+            return  # ignore focus changes while downloading
+        if not widget.get().strip():
+            widget.configure(border_color=self.theme["BORDER_DEFAULT"])
         else:
-            self.download_btn.configure(text="Download", fg_color=["#1976d2", "#1976d2"])
+            widget.configure(border_color=self.theme["BORDER_FOCUS"])
+        widget.configure(text_color=self.theme["TEXT_MAIN"])
+
+
+    def update_speed_hook(self, speed_string):
+        """Called by the worker to push speed updates to the UI."""
+        self.last_speed_text = f"Downloading @ {speed_string}"
+        
+        # Only update the button text if we aren't hovering!
+        # (We don't want to overwrite the 'Cancel' text while the user is trying to click it)
+        if self.downloading:
+            # Check if mouse is currently over the button (Tkinter's way)
+            x, y = self.app.winfo_pointerxy()
+            widget = self.app.winfo_containing(x, y)
+            
+            if widget != self.download_btn:
+                self.download_btn.configure(text=self.last_speed_text)
+
+    def set_downloading_state(self, is_downloading):
+        """Locks UI and applies your custom theme colors."""
+        self.downloading = is_downloading
+        state = "disabled" if is_downloading else "normal"
+        
+        # 1. Grab your theme values (with fallbacks just in case)
+        locked_bg = self.theme["BTN_DISABLED"]
+        locked_text = self.theme["TEXT_DISABLED"]
+        locked_border = self.theme["BORDER_DEFAULT"]
+        
+        normal_text = self.theme["TEXT_MAIN"]
+        normal_border = self.theme["BORDER_DEFAULT"]
+
+        widgets_to_toggle = [
+            self.url_entry, 
+            self.folder_entry, 
+            self.audio_switch,
+            self.paste_btn, 
+            self.folder_browse_btn
+        ]
+        
+        for widget in widgets_to_toggle:
+            if not widget: continue # Skip if a widget isn't defined yet
+            
+            # Apply the state
+            widget.configure(state=state)
+            
+            # Apply Theme Colors
+            if is_downloading:
+                # CustomTkinter specific 'disabled' color properties
+                widget.configure(
+                    text_color=locked_text,
+                    fg_color=locked_bg, # Some widgets need the BG changed manually
+                    border_color=locked_border
+                )
+            else:
+                # Restore original colors from your theme
+                widget.configure(
+                    text_color=normal_text,
+                    border_color=normal_border
+                )
+
+        # 2. Reset / Progress logic
+        if not is_downloading:
+            self._reset_ui_to_ready()
+        else:
+            self.download_btn.configure(text="Downloading...")
 
     def set_processing_state(self):
         """Transition UI from 'Downloading' to 'Merging/Finalizing'."""
-        # 1. Update Progress Bar to 100% (Indeterminate can also work here)
-        self.progress_bar.set(1.0)
+        self.app.logger.info("UI: Entering processing/merging state.")
+        
+        # 1. Update Progress Bar to an animated loading state
         self.progress_bar.configure(mode="indeterminate")
-        self.download_btn.configure(text="Finalising...")
+        self.progress_bar.start()  # This makes the bar bounce back and forth!
         
         # 2. Lock the button so they can't interrupt the FFmpeg merge
         self.download_btn.configure(
             text="Merging...",
             state="disabled",
-            fg_color="#e67e22"  # A distinct 'processing' orange
+            fg_color=self.theme["BTN_DISABLED"]
         )
 
-        # 3. Lock the UI (turns the button into a "Cancel" or "Downloading..." state)
-        self.set_downloading_state(True)
+    def _reset_ui_to_ready(self):
+        """Forces a full UI redraw to clear disabled states and reset the bar."""
+        # 1. KILL THE PROGRESS BAR (The Triple Threat)
+        if hasattr(self.app, 'progress_bar'):
+            self.progress_bar.stop()               # Stop the animation
+            self.progress_bar.configure(mode="determinate") # Stop the 'bounce'
+            self.progress_bar.set(0)               # Empty the bar
+            self.progress_bar.update()             # Force visual refresh
 
-        # 4. The Magic Link: Send it to the Thread Pool via the App Hub
-        self.app.logger.info(f"UI sending task to queue: {url}")
-        self.app.queue_manager.enqueue(url, folder, is_audio, use_ffmpeg)
+        # 2. DEFINE THE THEME RECOVERY
+        normal_fg = self.theme["BTN_ACTION"]
+        normal_hover = self.theme["BTN_HOVER"]
+        text_color = self.theme["TEXT_ACTION_BTN"]
+
+        # 3. WAKE UP THE BUTTONS
+        # We loop and explicitly re-apply colors that CTk might be 'caching'
+        for btn in [self.paste_btn, self.folder_browse_btn]:
+            if btn:
+                btn.configure(
+                    state="normal",
+                    fg_color=normal_fg,
+                    hover_color=normal_hover,
+                    text_color=text_color
+                )
+
+        # 4. RESET THE MAIN ACTION BUTTON
+        self.last_speed = ""
+        self.download_btn.configure(
+            text="Download",
+            state="normal",
+            fg_color=self.theme["BTN_ACTION"],
+            hover_color=self.theme["BTN_HOVER"],
+            text_color=self.theme["TEXT_ACTION_BTN"]
+        )
+
+        # 5. RE-ENABLE ENTRIES
+        for entry in [self.url_entry, self.folder_entry]:
+            entry.configure(state="normal", text_color=text_color)
+            
+        # Final nudge to the UI to update everything
+        self.app.update_idletasks()
 
     def download_success(self, task_info):
             """Handle successful download"""
@@ -275,10 +380,7 @@ class UIController:
             return
 
         url = self.url_entry.get().strip()
-        
-        # Make sure this variable name matches what you actually use for the folder!
-        # Sometimes it's self.folder_path, sometimes self.folder_entry.get()
-        folder = getattr(self, 'folder_path', "") 
+        folder = self.folder_entry.get()
         is_audio = self.audio_switch.get()
 
         if not url or not folder:
@@ -292,22 +394,27 @@ class UIController:
     def on_invalid_url(self, error_msg: str):
         """Handle invalid URL errors"""
         messagebox.showwarning("Invalid URL", f"Invalid URL provided:\n{error_msg}")
+    
+    def _on_download_btn_hover(self, event):
+        """Swaps speed for 'Cancel' only if we are currently downloading."""
+        if hasattr(self, 'downloading') and self.downloading:
+            self.download_btn.configure(
+                text="Cancel Download", 
+                fg_color="#C62828"
+            )
 
-    def on_focus_in(self, widget):
-        if self.downloading:
-            return  # ignore focus changes while downloading
-        if widget in [self.url_entry, self.folder_entry]:
-            widget.configure(border_color=self.theme["BORDER_FOCUS"])
-            widget.configure(text_color=self.theme["TEXT_MAIN"])
+    def _on_download_btn_leave(self, event):
+        """Restores the speed display when the mouse leaves."""
+        if hasattr(self, 'downloading') and self.downloading:
+            # If we have a stored speed, show it. Otherwise, generic 'Downloading...'
+            display_text = getattr(self, 'last_speed_text', "Downloading...")
+            self.download_btn.configure(
+                text=display_text,
+                fg_color="#1976d2",  # Back to blue
+                hover_color="#448BD3"
+            )
 
-    def on_focus_out(self, widget):
-        if self.downloading:
-            return  # ignore focus changes while downloading
-        if not widget.get().strip():
-            widget.configure(border_color=self.theme["BORDER_DEFAULT"])
-        else:
-            widget.configure(border_color=self.theme["BORDER_FOCUS"])
-        widget.configure(text_color=self.theme["TEXT_MAIN"])
+
     
     def select_folder(self):
         if folder := filedialog.askdirectory():
@@ -387,8 +494,16 @@ class UIController:
     def _update_ui_elements(self, progress_data):
         status = progress_data.get('status')
         
+        # --- HELPER: Universal ANSI Stripper ---
+        def clean_terminal_string(text):
+            if not isinstance(text, str):
+                return text
+            # This regex catches ALL terminal color/style escape codes
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            return ansi_escape.sub('', text).strip()
+
         if status == 'downloading':
-            value = None  # Start with no value
+            value = None  
             
             # --- NET 1: Try Raw Bytes Math ---
             downloaded = progress_data.get('downloaded_bytes')
@@ -400,13 +515,13 @@ class UIController:
             # --- NET 2: Try String Parsing (If math failed) ---
             elif '_percent_str' in progress_data:
                 percent_str = progress_data.get('_percent_str', '')
-                if '%' in percent_str:
+                if isinstance(percent_str, str) and '%' in percent_str:
                     try:
-                        # Clean hidden ANSI color codes and the % sign
-                        clean_percent = percent_str.replace('%', '').replace('\x1b[0;94m', '').replace('\x1b[0m', '').strip()
-                        value = float(clean_percent) / 100
+                        # Clean ALL hidden codes and the % sign
+                        clean_percent = clean_terminal_string(percent_str).replace('%', '')
+                        value = float(clean_percent) / 100.0
                     except (ValueError, TypeError):
-                        pass # String was too messy, leave value as None
+                        pass 
 
             # --- APPLY THE RESULT ---
             if value is not None:
@@ -416,14 +531,15 @@ class UIController:
                     self.progress_bar.configure(mode="determinate")
                 self.progress_bar.set(value)
             else:
-                # Both nets failed (size truly unknown). Pulse the bar.
-                self._switch_to_indeterminate()
+                # Both nets failed. Pulse the bar.
+                if hasattr(self, '_switch_to_indeterminate'):
+                    self._switch_to_indeterminate()
 
             # --- Update Button Text ---
-            speed = progress_data.get('_speed_str', '~')
-            if isinstance(speed, str):
-                speed = speed.replace('\x1b[0;94m', '').replace('\x1b[0m', '').strip()
-            self.download_btn.configure(text=f"Downloading... {speed}")
+            raw_speed = progress_data.get('_speed_str', '~')
+            clean_speed = clean_terminal_string(raw_speed) if raw_speed else '~'
+            
+            self.download_btn.configure(text=f"Downloading... {clean_speed}")
 
         elif status == 'finished':
             self.progress_bar.stop()
@@ -433,6 +549,7 @@ class UIController:
 
         elif status == 'error':
             self.progress_bar.stop()
+            self.progress_bar.configure(mode="determinate")
             self.progress_bar.set(0)
             self.download_btn.configure(text="Error!")
 
@@ -442,24 +559,28 @@ class UIController:
             self.progress_bar.configure(mode="indeterminate")
             self.progress_bar.start()
 
-    def on_progress_update(self, float_val):
-        """Receives 0.0-1.0 and updates the UI thread."""
-        # float_val is already between 0 and 1 from the worker
-        self.app.after(0, lambda: self.progress_bar.set(float_val))
+    def on_progress_update(self, target_value):
+        """Safely updates the progress bar to the new percentage."""
+        if not hasattr(self, 'progress_bar'):
+            return
 
-        current_val = self.progress_bar.get()
-        new_val = min(current_val + 0.01, 1.0)
-        self.progress_bar.set(new_val)
+        # If the bar is bouncing (like during merging), ignore percentage updates
+        if self.progress_bar.cget("mode") == "indeterminate":
+            return
 
-        # Schedule the NEXT frame (50ms = 20fps)
-        if new_val < 1.0:
-            self.app.after(50, self.app.animate_progress) 
+        # Directly set the new progress value
+        self.progress_bar.set(target_value)
 
     def cancel_download(self):
+        self.app.logger.info("UI: User requested download cancellation.")
+        
+        # 1. Send the kill signal to the background worker
         self.app.worker.cancel()
-        self.download_btn.configure(text="Download")
-        self.url_entry.configure(state="normal")
-        self.folder_entry.configure(state="normal")
+        
+        # 2. Keep it DRY! Use the state manager you already built
+        self.set_downloading_state(False)
+        
+        # 3. Re-validate to ensure the "Download" button is clickable again
         self.validate_inputs()
 
     def get_build_info(self):
