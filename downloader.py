@@ -10,6 +10,7 @@ class DownloadManager:
     def __init__(self, logger=None):
         self.logger = logger or MyLogger()
         self.progress_hook = None
+        self._cancel_requested = False
         
         # Cache the Deno path once we discover it
         try:
@@ -19,6 +20,7 @@ class DownloadManager:
             self._deno_path = None
             
     def download_media(self, url: str, folder: str, is_audio: bool) -> bool:
+        self._cancel_requested = False
         """Handle the actual media download process"""
         try:
             # Store the total bytes before starting the download
@@ -63,6 +65,8 @@ class DownloadManager:
             raise
             
     def download_progress_hook(self, d: Dict[str, Any]) -> None:
+        if self._cancel_requested:
+            raise Exception("DOWNLOAD_CANCELLED")
         """Progress hook for yt-dlp to update download progress"""
         try:
             # Get total bytes or estimate
@@ -104,3 +108,7 @@ class DownloadManager:
     def get_deno_path(self) -> str:
         """Get the path to the deno executable"""
         return self._deno_path
+    
+    def cancel(self):
+        """Signal the downloader to stop."""
+        self._cancel_requested = True

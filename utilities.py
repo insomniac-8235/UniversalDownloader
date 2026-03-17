@@ -14,6 +14,8 @@ THEME = {
     "BTN_ACTION": ("#1976D2", "#1976d2"),
     "BTN_DISABLED": ("#f8f8f8", "#353638"),
     "BTN_HOVER": ("#448BD3", "#448BD3"),
+    "BTN_CANCEL": ("#e53935", "#e53935"),
+    "BTN_CANCEL_HOVER": ("#b71c1c", "#b71c1c"),
     "PROG_FILL": ("#1976D2", "#1976D2"),
     "PROG_BG": ("#f8f8f8", "#353638"),
     "SWITCH_BTN": ("#dedede", "#999999"),   
@@ -24,26 +26,6 @@ THEME = {
     "TEXT_GHOST": ("#999999", "#4e4e53"),
     "TEXT_VERSION": ("#dedede","#353638")
 }
-# THEME = {
-#     "APP_BG": ("#ffffff", "#1e1e1e"),
-#     "BG_FRAME": ("#ffffff", "#1e1e1e"),
-#     "BORDER_DEFAULT": ("#999999", "#4e4f52"),
-#     "BORDER_HOVER": ("#1976D2", "#6b6b6b"),
-#     "ENTRY_BG": ("#cecece", "#353638"),
-#     "ENTRY_HOVER": ("#d4d4d4", "#353638"),
-#     "ENTRY_FOCUS": ("#1976D2", "#1976D2"),
-#     "BTN_ACTION": ("#1976D2", "#1976d2"),
-#     "BTN_DISABLED": ("#d4d4d4", "#353638"),
-#     "BTN_HOVER": ("#448BD3", "#448BD3"),
-#     "PROG_FILL": ("#1976D2", "#1976D2"),
-#     "PROG_BG": ("#d4d4d4", "#353638"),
-#     "TEXT_ACTION": ("#EBEBEB", "#c4c4c4"),
-#     "TEXT_DISABLED": ("#CECECE", "#4e4f52"),
-#     "TEXT_ENTRY": ("#000000", "#353638"),
-#     "TEXT_MAIN": ("#444444", "#a7a8ab"),
-#     "TEXT_GHOST": ("#666666", "#67676d"),
-#     "TEXT_VERSION": ("#888888","#353638")
-# }
 
 def get_deno_path() -> str:
     """Return the absolute path to the Deno binary."""

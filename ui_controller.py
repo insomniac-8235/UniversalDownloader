@@ -2,8 +2,8 @@ import customtkinter as ctk
 from tkinter import filedialog
 import os
 import sys
-import threading
 from typing import Optional
+import threading
 from utilities import THEME, ProgressParser
 from yt_dlp import YoutubeDL
 
@@ -269,6 +269,8 @@ class UIController:
 
         # Download Button
         self.download_btn.configure(command=self.on_download_button_click)
+        self.download_btn.bind("<Enter>", self.on_btn_hover)
+        self.download_btn.bind("<Leave>", self.on_btn_leave)
 
     def validate_inputs(self, event=None):
         url = self.url_entry.get().strip()
@@ -294,6 +296,21 @@ class UIController:
                 text="Enter a URL & Location",
                 fg_color=self.theme["BTN_DISABLED"],
                 text_color_disabled=self.theme["TEXT_DISABLED"]
+            )
+
+    def on_btn_hover(self, event):
+        if hasattr(self, 'downloading') and self.downloading:
+            self.download_btn.configure(
+                text="Cancel", 
+                fg_color=self.theme["BTN_CANCEL"],
+                hover_color=self.theme["BTN_CANCEL"]
+            )
+
+    def on_btn_leave(self, event):
+        if hasattr(self, 'downloading') and self.downloading:
+            self.download_btn.configure(
+                text=f"Downloading...",
+                fg_color=self.theme["BTN_ACTION"]
             )
 
     def on_focus_in(self, widget):
@@ -349,6 +366,11 @@ class UIController:
             self.validate_inputs()
 
     def on_download_button_click(self):
+        # IF CURRENTLY DOWNLOADING -> ACT AS CANCEL
+        if hasattr(self, 'downloading') and self.downloading:
+            self.download_manager.cancel()
+            self.download_btn.configure(text="Cancelling...", state="disabled")
+            return
         url = self.url_entry.get().strip()
         folder = self.folder_entry.get().strip()
         is_audio = self.audio_switch.get()
@@ -454,6 +476,7 @@ class UIController:
         self.show_popup("Download Complete!" if success else "Download Failed!", success, error_detail)
     
     def lock_ui(self, button_text="Downloading..."):
+        self.downloading = True
         """Lock all UI elements during download"""
         self.url_entry.configure(state="disabled")
         self.folder_entry.configure(state="disabled")
@@ -464,11 +487,9 @@ class UIController:
         self.audio_switch.configure(state="disabled")
         
         self.download_btn.configure(
-            state="disabled",
+            state="normal", 
             text=button_text,
-            fg_color=self.theme["BTN_DISABLED"],
-            hover_color=self.theme["BTN_ACTION"],
-            text_color_disabled=self.theme["TEXT_DISABLED"]
+            fg_color=self.theme["BTN_ACTION"]
         )
     
     def unlock_ui(self):
