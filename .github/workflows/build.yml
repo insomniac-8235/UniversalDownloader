@@ -51,8 +51,8 @@ jobs:
             --add-data "assets;assets" `
             --add-binary "bin/ffmpeg.exe;bin" `
             --add-binary "bin/deno.exe;bin" `
-            --icon "assets/icon.ico" 
-            --name "${{ env.APP_NAME }}" 
+            --icon "assets/icon.ico" `
+            --name "${{ env.APP_NAME }}" `
             main.py
 
       - name: Prepare Artifact
@@ -104,8 +104,11 @@ jobs:
             --add-data "assets:assets" \
             --add-binary "bin/ffmpeg:bin" \
             --add-binary "bin/deno:bin" \
-            --icon "assets/icon.icns" 
-            --name "${{ env.APP_NAME }}" 
+            --icon "assets/icon.icns" \
+            --name "${{ env.APP_NAME }}" \
+            --osx-bundle-identifier "com.personal.universal-downloader" \
+            --metadata "FileVersion=${{ env.CLEAN_VERSION }}" \
+            --metadata "ProductVersion=${{ env.CLEAN_VERSION }}" \
             main.py
 
       - name: Create DMG
