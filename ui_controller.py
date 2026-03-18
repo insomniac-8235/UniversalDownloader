@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import os
 import sys
 from typing import Optional
@@ -12,7 +12,9 @@ class UIController:
         self.root = root
         self.download_manager = download_manager
         self.logger = logger
-        
+        self.last_speed = ""
+        self.btn_is_hovered = False
+        self.downloading=False
         # Copy module-level THEME to instance (avoid mutation issues)
         self.theme = THEME.copy()
         
@@ -299,24 +301,23 @@ class UIController:
             )
 
     def on_btn_hover(self, event):
-        if hasattr(self, 'downloading') and self.downloading:
+        self.btn_is_hovered = True
+        if self.downloading:
             self.download_btn.configure(
-                text="Cancel", 
-                fg_color=self.theme["BTN_CANCEL"],
-                hover_color=self.theme["BTN_CANCEL"]
+                text="Cancel Download", 
+                fg_color="#e53935", # Red
             )
 
     def on_btn_leave(self, event):
-        if hasattr(self, 'downloading') and self.downloading:
+        self.btn_is_hovered = False
+        if self.downloading:
+            # Snap back to the last known speed
             self.download_btn.configure(
-                text=f"Downloading...",
+                text=f"Downloading @ {self.last_speed}" if self.last_speed else "Downloading...",
                 fg_color=self.theme["BTN_ACTION"]
             )
 
     def on_focus_in(self, widget):
-        # is_dark = ctk.get_appearance_mode() == "Dark"
-        # idx = 1 if is_dark else 0
-
         # Check if the widget is an Entry field
         if isinstance(widget, ctk.CTkEntry):
             widget.configure(
@@ -327,8 +328,8 @@ class UIController:
         # Check if the widget is a Button
         elif isinstance(widget, ctk.CTkButton):
             widget.configure(
-                fg_color=self.theme["BTN_HOVER"], # Light blue
-                text_color=self.theme["TEXT_ACTION_BTN"] # Keep button text white
+                fg_color=self.theme["BTN_ACTION"],
+                text_color=self.theme["TEXT_ACTION_BTN"]
             )
 
     def on_focus_out(self, widget):
@@ -344,7 +345,7 @@ class UIController:
         
         elif isinstance(widget, ctk.CTkButton):
             widget.configure(
-                fg_color=self.theme["BTN_ACTION"], # Darker blue
+                fg_color=self.theme["BTN_ACTION"],
                 text_color=self.theme["TEXT_ACTION_BTN"]
             )
     
@@ -401,79 +402,73 @@ class UIController:
                 daemon=True
             )
             t.start()
-    # def on_download_button_click(self):
-    #     url = self.url_entry.get().strip()
-    #     folder = self.folder_entry.get().strip()
-    #     is_audio = self.audio_switch.get()
 
-    #     # NEW: validate the URL before starting the download
-    #     if url and folder and os.path.isdir(folder):
-    #         try:
-    #             # yt‑dlp will raise an exception if the URL is bad
-    #             YoutubeDL({'quiet': True}).extract_info(url, download=False)
-    #         except Exception as e:
-    #             # Show an ERROR popup and stop
-    #             self.show_popup("Error", False, str(e))
-    #             return
-    #     # ────────────
+    def download_progress_hook(self, progress, speed="0B/s"):
+        """Handles the shift from bar-filling to bouncing-bar mode."""
+        
+        if speed == "FINALISING":
+            # If we aren't already in indeterminate mode, switch now
+            if self.progress_bar.cget("mode") != "indeterminate":
+                self.root.after(0, self.enter_finalising_ui)
+            return
 
-    #     if url and folder and os.path.isdir(folder):
-    #         self.lock_ui("Downloading...")
-    #         self.download_manager.set_progress_hook(self.download_progress_hook)
-
-    #         # Run the download in a background thread so the UI stays responsive
-    #         t = threading.Thread(
-    #             target=self.download_thread,
-    #             args=(url, folder, is_audio),
-    #             daemon=True
-    #         )
-    #         t.start()
-    #     elif self.download_btn.cget("text") not in ("Downloading...", "Finalising..."):
-    #         self.download_btn.configure(
-    #             state="disabled",
-    #             text="Enter a URL & Location",
-    #             fg_color=self.theme["BTN_DISABLED"],
-    #             text_color_disabled=self.theme["TEXT_DISABLED"]
-    #         )
-    
-    def download_progress_hook(self, progress):
-        """
-        Convert the 0-100 percentage from DownloadManager into the 0-1
-        range that CTkProgressBar expects.
-        """
-        # Ensure we only update the progress bar on the main thread
+        # Normal progress updates
         self.root.after(0, lambda p=progress: self.progress_bar.set(p / 100))
         
-        # NEW: Detect phase from progress info
-        info_str = str(progress).lower()
-        phase = ProgressParser.detect_phase(info_str)
-        
-        if phase == "MERGING":
-            self.progress_bar.configure(mode="indeterminate")
-            self.progress_bar.set(0.5)  # Indeterminate bounce (use fixed intermediate value)
-            self.download_btn.configure(
-                state="disabled",
-                text="Finalising...",
-                fg_color=self.theme["BTN_ACTION"]
-            )
-        else:
-            # Normal download progress handling...
-            self.progress_bar.set(progress / 100)
+        if not getattr(self, 'btn_is_hovered', False) and self.downloading:
+            self.root.after(0, lambda: self.download_btn.configure(text=f"Downloading @ {speed}"))
+
+    def enter_finalising_ui(self):
+        """Sets the UI to the 'Home Stretch' state."""
+        self.progress_bar.configure(mode="indeterminate")
+        self.progress_bar.start() # Bar bounces back and forth
+        self.download_btn.configure(
+            text="Finalising...",
+            state="disabled", # Disable button to prevent double-cancelling during merge
+            fg_color=self.theme["BTN_DISABLED"]
+        )
+
+    def enter_finalising_state(self):
+        """Changes the UI look for the post-processing phase."""
+        self.progress_bar.configure(mode="indeterminate")
+        self.progress_bar.start() # Makes the bar bounce back and forth
+        self.download_btn.configure(
+            text="Finalising...",
+            state="disabled", # Disable cancel once we are merging (it's too late usually)
+            fg_color=self.theme["BTN_DISABLED"]
+        )
         
     # New helper method to run the download in a background thread
     def download_thread(self, url: str, folder: str, is_audio: bool):
+        """Runs the download and catches the planned 'Cancel' exception."""
         try:
             success = self.download_manager.download_media(url, folder, is_audio)
-            # Schedule the completion callback on the main thread
+            # Schedule completion on the main thread
             self.root.after(0, self.download_complete, success, None)
+            
         except Exception as exc:
-            self.logger.error(f"Download failed: {exc}")
-            self.root.after(0, self.download_complete, False, str(exc))
+            # Check if this was a manual cancel or a real error
+            if str(exc) == "DOWNLOAD_CANCELLED":
+                self.logger.info("User aborted the download.")
+                # Pass 'False' but NO error detail so we don't show a 'Failed' popup
+                self.root.after(0, self.download_complete, False, None)
+            else:
+                self.logger.error(f"Download failed: {exc}")
+                self.root.after(0, self.download_complete, False, str(exc))
 
     def download_complete(self, success, error_detail=None):
-        """Handle download completion or failure"""
+        """Handle download completion or failure."""
         self.unlock_ui()
-        self.show_popup("Download Complete!" if success else "Download Failed!", success, error_detail)
+        self.downloading = False # <-- Fix: Use 'downloading', not 'is_downloading'
+        self.last_speed = "" 
+        
+        # Only show the popup if it was a success OR if there is a real error detail
+        if success or error_detail:
+            self.show_popup(
+                "Download Complete!" if success else "Download Failed!", 
+                success, 
+                error_detail
+            )
     
     def lock_ui(self, button_text="Downloading..."):
         self.downloading = True
@@ -519,47 +514,18 @@ class UIController:
         )
         
         self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate")
         self.progress_bar.set(0)
         
         self.validate_inputs()
     
     def show_popup(self, title: str, success: bool, error_detail: Optional[str] = None):
-        popup = ctk.CTkToplevel(self.root)
-        
-        # 1. Pick a safe string from your theme
-        bg_color = self.theme["APP_BG"]
-        text_color = self.theme["TEXT_MAIN"]
-
-        # 2. Configure the window background
-        popup.configure(fg_color=bg_color)
-        popup.title(title)
-        popup.geometry("400x200")
-        popup.resizable(False, False)
-        # Optional: Force the window to stay on top
-        popup.attributes("-topmost", True)
-        
-        # 3. Ensure labels inside use the correct text color so they don't disappear
-        label = ctk.CTkLabel(
-            popup,
-            wraplength=300,
-            font=self.main_font,
-            text_color=text_color  # Explicitly set this!
-        )
-        label.pack(expand=True, pady=(20, 10))
-        
-        btn = ctk.CTkButton(
-            popup,
-            text="Close",
-            font=self.main_font,
-            width=120,
-            height=36,
-            corner_radius=25,
-            fg_color=self.theme["BTN_ACTION"],
-            hover_color=self.theme["BTN_HOVER"],
-            text_color=self.theme["TEXT_ACTION_BTN"],
-            command=lambda: (popup.grab_release(), popup.destroy())
-        )
-        btn.pack(pady=(0, 20))
+        """Replaces the custom Toplevel with native system message boxes."""
+        if success:
+            messagebox.showinfo(title=title, message="Your download has completed successfully!")
+        else:
+            msg = error_detail if error_detail else "An unknown error occurred."
+            messagebox.showerror(title=title, message=msg)
 
     def get_build_info(self):                                                                                 
         """Combines Version Number and Git Commit for the UI."""                                              

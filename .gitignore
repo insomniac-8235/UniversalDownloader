@@ -11,6 +11,7 @@ dist/
 # Ignore Binaries
 ffmpeg
 deno
+bin/
 deno_bin/
 ffmpeg_bin/
 

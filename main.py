@@ -29,8 +29,15 @@ class UniversalDownloader(ctk.CTk):
                     except Exception as e:
                         print(f"Icon failed to load: {e}")
         
-        # Initialize UI controller
-        self.controller = UIController(self, DownloadManager(), MyLogger())
+        # Create one logger instance to share
+        logger = MyLogger()
+        
+        # Initialize UI controller with shared components
+        self.controller = UIController(
+            self, 
+            DownloadManager(logger=logger), 
+            logger
+        )
 
 if __name__ == "__main__":
     app = UniversalDownloader()

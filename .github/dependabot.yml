@@ -1,22 +1,15 @@
 version: 2
-
 updates:
-  # Keep GitHub Actions updated
-  - package-ecosystem: "github-actions"
-    directory: "/"                 # Location of workflow files
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    # Cannot use wildcards in versions for github-actions, so we omit 'ignore' here
+# 1. Keep Python dependencies (yt-dlp, customtkinter, etc.) up to date
+- package-ecosystem: "pip"
+  directory: "/" # Look for requirements.txt in the root
+  schedule:
+    interval: "daily"
+  open-pull-requests-limit: 5
 
-  # Keep Python dependencies in requirements.txt updated
-  - package-ecosystem: "pip"
-    directory: "/"                 # Root of repo where requirements.txt is
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    ignore:
-      # Example: ignore a pre-release version of a specific package
-      # Dependabot uses valid PEP 440 specifiers
-      - dependency-name: "examplepackage"
-        versions: ["<2.0.0a0"]      # Ignore alpha/beta/rc releases below 2.0.0
+# 2. Keep GitHub Actions up to date (updates the pinned SHAs!)
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    interval: "weekly"
+  open-pull-requests-limit: 5

@@ -1,17 +1,22 @@
 from yt_dlp import YoutubeDL
-from typing import Optional, Dict, Any, Callable
+from typing import Dict, Any, Callable
 import os
-import sys
-import shutil
-from utilities import MyLogger, get_deno_path, get_ffmpeg_path
+import re
+from utilities import get_deno_path, get_ffmpeg_path
 
 
 class DownloadManager:
-    def __init__(self, logger=None):
-        self.logger = logger or MyLogger()
+    def __init__(self, logger):
+        self.logger = logger
         self.progress_hook = None
         self._cancel_requested = False
-        
+        self._total_bytes = 0
+        self._primary_finished = False # Tracks if we finished the first file
+        self._deno_path = get_deno_path()
+        if self._deno_path:
+            self.logger.info(f"Deno runtime detected: {self._deno_path}")
+        else:
+            self.logger.warning("Deno not found in bin/. Downloads may be slower on some sites.")
         # Cache the Deno path once we discover it
         try:
             self._deno_path = get_deno_path()
@@ -21,6 +26,8 @@ class DownloadManager:
             
     def download_media(self, url: str, folder: str, is_audio: bool) -> bool:
         self._cancel_requested = False
+        self._primary_finished = False # Reset for each new task
+        self._total_bytes = 0
         """Handle the actual media download process"""
         try:
             # Store the total bytes before starting the download
@@ -45,6 +52,7 @@ class DownloadManager:
                 'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
                 'logger': self.logger,
                 'progress_hooks': [self],
+                'postprocessor_hooks': [self.post_process_hook],
                 
                 # Correctly-structured js_runtimes:
                 #   runtime name → config dict (executable_path + options list)
@@ -63,35 +71,50 @@ class DownloadManager:
         except Exception as e:
             self.logger.error(f"Download failed: {str(e)}")
             raise
-            
+
+    def post_process_hook(self, d: Dict[str, Any]) -> None:
+        """Called when yt-dlp starts merging, converting, or fixing up."""
+        if d.get('status') == 'started':
+            if self.progress_hook:
+                # We send 100% progress and a special 'FINALIZING' speed tag
+                self.progress_hook(100.0, "FINALISING")
+
     def download_progress_hook(self, d: Dict[str, Any]) -> None:
-        if self._cancel_requested:
+        if getattr(self, '_cancel_requested', False):
             raise Exception("DOWNLOAD_CANCELLED")
-        """Progress hook for yt-dlp to update download progress"""
+
+        status = d.get('status')
+        
+        # 1. Detect when the FIRST download finishes
+        if status == 'finished' and not self._primary_finished:
+            self._primary_finished = True
+
+        # 2. If we are in the 'second' download (Audio track for DASH/HLS)
+        # or if it's already finished the first file, just say 'FINALISING'
+        if self._primary_finished:
+            if self.progress_hook:
+                self.progress_hook(100, "FINALISING")
+            return
+
+        # 3. Standard Primary Download Progress
         try:
-            # Get total bytes or estimate
-            total = d.get('total_bytes', 0)
-            if total == 0:
-                total = d.get('total_bytes_estimate', 0)
+            total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+            downloaded = d.get('downloaded_bytes', 0)
             
-            # Store the total bytes when we first know them (use value check, not hasattr)
             if total > 0 and self._total_bytes == 0:
                 self._total_bytes = total
             
-            # Calculate progress based on stored total
-            if self._total_bytes > 0:
-                downloaded = d.get('downloaded_bytes', 0)
-                progress = (downloaded / self._total_bytes) * 100
-                
-                # Call the progress hook if it's been set
-                if self.progress_hook:
-                    self.progress_hook(progress)
-            else:
-                # If no total available, keep in indeterminate mode
-                pass
+            progress = (downloaded / self._total_bytes * 100) if self._total_bytes > 0 else 0
             
+            # Clean the speed string
+            raw_speed = d.get('_speed_str', '0B/s')
+            clean_speed = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', raw_speed).strip()
+            
+            if self.progress_hook:
+                self.progress_hook(progress, clean_speed)
+                
         except Exception as e:
-            print(f"Progress hook error: {e}")
+            print(f"Hook Error: {e}")
             
     def __call__(self, d: Dict[str, Any]) -> None:
         """Handle progress updates"""
@@ -103,11 +126,11 @@ class DownloadManager:
         
     def get_ffmpeg_path(self) -> str:
         """Get the path to the ffmpeg executable"""
-        return get_ffmpeg_path()
+        return self.get_ffmpeg_path()
 
     def get_deno_path(self) -> str:
         """Get the path to the deno executable"""
-        return self._deno_path
+        return self.get_deno_path()
     
     def cancel(self):
         """Signal the downloader to stop."""
