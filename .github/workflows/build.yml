@@ -65,7 +65,7 @@ jobs:
           echo "FINAL_NAME=$NewName" >> $env:GITHUB_ENV
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@b7c566a # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v6.0.0
         with:
           name: windows-bin
           path: dist/${{ env.FINAL_NAME }}
@@ -121,7 +121,7 @@ jobs:
           echo "FINAL_NAME_MAC=$CLEAN_NAME" >> $GITHUB_ENV
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@b7c566a
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: macos-bin
           path: ${{ env.FINAL_NAME_MAC }}
