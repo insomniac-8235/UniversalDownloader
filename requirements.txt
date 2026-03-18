@@ -2,3 +2,4 @@ customtkinter==5.2.2
 Pillow==12.1.1
 PyInstaller==6.19.0
 yt_dlp==2026.3.13
+yt-dlp-ejs>=2025.1.1

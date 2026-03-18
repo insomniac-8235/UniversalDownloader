@@ -1,7 +1,7 @@
 name: Dev Builds
 
 on:
-  workflow_dispatch:   # Manual trigger
+  workflow_dispatch:   # Manual trigger for side builds
 
 env:
   APP_NAME: "Universal Downloader"
@@ -31,18 +31,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller "yt-dlp[default]"
+          pip install pyinstaller "yt-dlp[default]" yt-dlp-ejs
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
 
       - name: Install & Verify Binaries (Choco)
         shell: pwsh
         run: |
           choco install deno ffmpeg aria2 -y
-          refreshenv
-          mkdir bin
-          Copy-Item "C:\ProgramData\chocolatey\bin\deno.exe" "bin\deno.exe"
-          Copy-Item "C:\ProgramData\chocolatey\bin\ffmpeg.exe" "bin\ffmpeg.exe"
-          Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" "bin\aria2c.exe"
+          mkdir -p bin
+          # Using Get-Command ensures we find the real EXE binaries, not just shims
+          Copy-Item (Get-Command deno).Source "bin\deno.exe"
+          Copy-Item (Get-Command ffmpeg).Source "bin\ffmpeg.exe"
+          Copy-Item (Get-Command aria2c).Source "bin\aria2c.exe"
           Get-FileHash bin/*.exe | Format-List
 
       - name: Build Executable
@@ -54,7 +54,7 @@ jobs:
             --add-binary "bin/ffmpeg.exe;bin" `
             --add-binary "bin/deno.exe;bin" `
             --add-binary "bin/aria2c.exe;bin" `
-            --icon "assets/icon.ico" --name "${{ env.APP_NAME }}" 
+            --icon "assets/icon.ico" --name "${{ env.APP_NAME }}" `
             main.py
 
       - name: Rename and Prepare Artifact
@@ -68,10 +68,10 @@ jobs:
           echo "FINAL_NAME=$NewName" >> $env:GITHUB_ENV
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@b7c566a # v6.0.0
+        uses: actions/upload-artifact@604373da71285677a1a094577bb8babed859e82c # v4.6.0
         with:
           name: windows-dev-build
-          path: dist/${{ env.env.FINAL_NAME }}.exe
+          path: dist/${{ env.FINAL_NAME }}.exe
 
   build-macos:
     name: Build macOS (Dev)
@@ -82,8 +82,6 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Generate Build Metadata
         run: |
@@ -94,7 +92,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pyinstaller "yt-dlp[default]"
+          pip install pyinstaller "yt-dlp[default]" yt-dlp-ejs
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Install & Verify Binaries (Brew)
@@ -115,8 +113,8 @@ jobs:
             --add-binary "bin/ffmpeg:bin" \
             --add-binary "bin/deno:bin" \
             --add-binary "bin/aria2c:bin" \
-            --icon "assets/icon.icns" 
-            --name "${{ env.APP_NAME }}" 
+            --icon "assets/icon.icns" \
+            --name "${{ env.APP_NAME }}" \
             main.py
 
       - name: Create DMG
@@ -136,7 +134,7 @@ jobs:
           echo "FINAL_NAME_MAC=${CLEAN_NAME}" >> $GITHUB_ENV
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@b7c566a
+        uses: actions/upload-artifact@604373da71285677a1a094577bb8babed859e82c
         with:
           name: macos-dev-build
           path: ${{ env.FINAL_NAME_MAC }}.dmg

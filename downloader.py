@@ -13,6 +13,7 @@ class DownloadManager:
         self._total_bytes = 0
         self._primary_finished = False # Tracks if we finished the first file
         self._deno_path = get_deno_path()
+        self._ffmpeg_path = get_ffmpeg_path()
         if self._deno_path:
             self.logger.info(f"Deno runtime detected: {self._deno_path}")
         else:
@@ -26,42 +27,25 @@ class DownloadManager:
             
     def download_media(self, url: str, folder: str, is_audio: bool) -> bool:
         self._cancel_requested = False
-        self._primary_finished = False # Reset for each new task
-        self._total_bytes = 0
-        """Handle the actual media download process"""
+        self._primary_finished = False
+        
         try:
-            # Store the total bytes before starting the download
-            self._total_bytes = 0
-            
-            # Ensure ffmpeg is properly configured
-            ffmpeg_path = get_ffmpeg_path()
-            if not ffmpeg_path:
-                raise FileNotFoundError("FFmpeg not found in PATH")
-            
-            # Make sure we have a Deno binary before proceeding
-            if not self._deno_path:
-                raise FileNotFoundError(
-                    "Deno binary not found. Please install Deno or set DENO_PATH."
-                )
-
             ydl_opts = {
-                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
-                'restrictfilenames': True,
-                'noplaylist': True,
-                'ffmpeg_location': ffmpeg_path,
+                'format': 'bestvideo+bestaudio/best' if not is_audio else 'bestaudio/best',
                 'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
-                'logger': self.logger,
-                'progress_hooks': [self],
+                'progress_hooks': [self.download_progress_hook],
                 'postprocessor_hooks': [self.post_process_hook],
                 
-                # Correctly-structured js_runtimes:
-                #   runtime name → config dict (executable_path + options list)
+                # 1. The correct dictionary syntax for 2026
                 'js_runtimes': {
-                    'deno': {
-                        'executable_path': self._deno_path,
-                        'options': []          # ← leave empty unless extra flags are needed
-                    }
-                },
+                    'deno': {'path': self._deno_path}
+                } if self._deno_path else {},
+
+                # 2. Enabling the automatic remote solver fetch
+                'remote_components': ['ejs:github'],
+                
+                # 3. Use the plugin for easier management
+                'allow_unsecure_tools': False,
             }
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
