@@ -4,8 +4,9 @@
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/insomniac-8235/UniversalDownloader/build.yml)
 ![Release Build](https://github.com/insomniac-8235/UniversalDownloader/actions/workflows/build.yml/badge.svg)
 ![Dev Build](https://github.com/insomniac-8235/UniversalDownloader/actions/workflows/dev-build.yml/badge.svg)
+
 # Universal Media Downloader
-A powerful, easy-to-use GUI for downloading media from various platforms. A standalone, high-performance media archiving utility for Windows and macOS. Built as an educational project exploring Python GUI development, asynchronous threading, and integrating external binaries (`yt-dlp`, FFmpeg) into a single compiled executable.
+A powerful, easy-to-use GUI for downloading media from various platforms. A standalone, high-performance media archiving utility for Windows and macOS. Built as an educational project exploring Python GUI development, asynchronous threading, and integrating external binaries (`yt-dlp`, `deno`, `FFmpeg`) into a single compiled executable.
 
 ---
 
@@ -15,8 +16,6 @@ Click the links below to get the latest stable version for your platform:
 
 - **Windows:** [Download Latest Executable (win64)](https://github.com/insomniac-8235/UniversalDownloader/releases/latest)  
 - **macOS:** [Download Latest DMG](https://github.com/insomniac-8235/UniversalDownloader/releases/latest)
-
-All releases include a `versions.txt` file containing the release tag and commit hash for traceability.
 
 ---
 
@@ -41,7 +40,6 @@ All releases include a `versions.txt` file containing the release tag and commit
 ### macOS Main Window
 ![macOS Main Window](docs/screenshots/macos_main.png)  
 *The macOS interface, visually similar to Windows.*
-
 
 ---
 
@@ -68,8 +66,8 @@ All releases include a `versions.txt` file containing the release tag and commit
 ---
 
 ## Core Technologies
-* **Engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp)  
-* **UI Framework:** [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)  
+* **Engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+* **UI Framework:** [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
 * **Media Merging:** [FFmpeg](https://ffmpeg.org/)
 
 ---
