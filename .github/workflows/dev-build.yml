@@ -31,7 +31,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # PyInstaller 6.19.0+ is required for Python 3.14.3
           pip install --upgrade pyinstaller "yt-dlp[default]"
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
 
@@ -52,7 +51,7 @@ jobs:
           # 4. Copy them to your local bin folder
           Copy-Item $denoPath "bin\deno.exe"
           Copy-Item $ffmpegPath "bin\ffmpeg.exe"
-                    
+
           # 5. Verify the files are there
           Get-ChildItem bin\
 
@@ -64,7 +63,8 @@ jobs:
             --add-data "assets;assets" `
             --add-binary "bin/ffmpeg.exe;bin" `
             --add-binary "bin/deno.exe;bin" `
-            --icon "assets/icon.ico" --name "${{ env.APP_NAME }}" `
+            --icon "assets/icon.ico" `
+            --name "${{ env.APP_NAME }}" `
             main.py
 
       - name: Rename and Prepare Artifact

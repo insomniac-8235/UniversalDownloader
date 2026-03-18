@@ -21,7 +21,7 @@ Click the links below to get the latest stable version for your platform:
 
 ## Features
 * **Simple GUI:** Built with CustomTkinter for a modern look.  
-* **High Quality:** Powered by `yt-dlp` for the best available resolution.  
+* **High Quality:** Powered by `yt-dlp` and `deno` for the best available resolution.  
 * **Portable:** No installation required on Windows; drag-and-drop to Applications on macOS.  
 * **Cross-Platform:** Fully supports Windows and macOS.  
 
