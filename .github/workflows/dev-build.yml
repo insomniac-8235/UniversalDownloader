@@ -38,10 +38,23 @@ jobs:
       - name: Install & Verify Binaries (Choco)
         shell: pwsh
         run: |
-          choco install deno ffmpeg aria2 -y
-          mkdir -p bin
-          Copy-Item (Get-Command deno).Source "bin\deno.exe"
-          Copy-Item (Get-Command ffmpeg).Source "bin\ffmpeg.exe"
+          # 1. Install the tools
+          choco install deno ffmpeg -y
+          
+          # 2. Ensure the bin folder exists
+          if (!(Test-Path bin)) { New-Item -ItemType Directory -Path bin }
+          
+          # 3. Search the Chocolatey 'lib' folder for the real .exe files
+          # This finds the actual binaries even if the PATH hasn't updated
+          $denoPath = (Get-ChildItem -Path "C:\ProgramData\chocolatey\lib" -Filter "deno.exe" -Recurse | Select-Object -First 1).FullName
+          $ffmpegPath = (Get-ChildItem -Path "C:\ProgramData\chocolatey\lib" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1).FullName
+          
+          # 4. Copy them to your local bin folder
+          Copy-Item $denoPath "bin\deno.exe"
+          Copy-Item $ffmpegPath "bin\ffmpeg.exe"
+                    
+          # 5. Verify the files are there
+          Get-ChildItem bin\
 
       - name: Build Executable
         shell: pwsh
