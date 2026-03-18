@@ -31,6 +31,7 @@ class DownloadManager:
         
         try:
             ydl_opts = {
+                'ffmpeg_location': self._ffmpeg_path,
                 'format': 'bestvideo+bestaudio/best' if not is_audio else 'bestaudio/best',
                 'outtmpl': os.path.join(folder, '%(title)s [%(id)s].%(ext)s'),
                 'progress_hooks': [self.download_progress_hook],
