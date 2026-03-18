@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"name": "MAIN (Production)",
+			"path": "."
+		},
+		{
+			"name": "v0.2.2 (Features)",
+			"path": "../universal-downloader-022"
+		},
+		{
+			"name": "V1 (Rework)",
+			"path": "../universal-downloader-v1"
+		}
+	],
+	"settings": {
+		"window.title": "${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}"
+	}
+}
