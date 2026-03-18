@@ -5,7 +5,7 @@ on:
 
 env:
   APP_NAME: "Universal Downloader"
-  VERSION: "v0.2.1"
+  VERSION: "v0.2.2"
   PYTHON_VERSION: "3.14.3"
 
 jobs:
