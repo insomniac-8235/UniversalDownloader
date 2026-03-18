@@ -112,7 +112,7 @@ jobs:
           mkdir -p dist/dmg_staging
           cp -R "dist/${{ env.APP_NAME }}_macOS.app" dist/dmg_staging/
           ln -s /Applications dist/dmg_staging/Applications
-          hdiutil create -volname "${{ env.APP_NAME }} ${{ env.VERSION }}" -srcfolder dist/dmg_staging -ov -format UDZO "Release.dmg"
+          hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder dist/dmg_staging -ov -format UDZO "Release.dmg"
 
       - name: Rename DMG for Release
         run: |
@@ -121,7 +121,7 @@ jobs:
           echo "FINAL_NAME_MAC=$CLEAN_NAME" >> $GITHUB_ENV
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@b7c566a
+        uses: actions/upload-artifact@v4
         with:
           name: macos-bin
           path: ${{ env.FINAL_NAME_MAC }}
@@ -134,12 +134,12 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@fa0b912 # v4.4.1
+        uses: actions/download-artifact@v4
         with:
           path: release_assets
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ env.APP_NAME }} ${{ github.ref_name }}
           generate_release_notes: true
