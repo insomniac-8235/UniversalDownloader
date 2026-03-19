@@ -427,16 +427,6 @@ class UIController:
             state="disabled", # Disable button to prevent double-cancelling during merge
             fg_color=self.theme["BTN_DISABLED"]
         )
-
-    def enter_finalising_state(self):
-        """Changes the UI look for the post-processing phase."""
-        self.progress_bar.configure(mode="indeterminate")
-        self.progress_bar.start() # Makes the bar bounce back and forth
-        self.download_btn.configure(
-            text="Finalising...",
-            state="disabled", # Disable cancel once we are merging (it's too late usually)
-            fg_color=self.theme["BTN_DISABLED"]
-        )
         
     # New helper method to run the download in a background thread
     def download_thread(self, url: str, folder: str, is_audio: bool):
@@ -524,7 +514,7 @@ class UIController:
         if success:
             messagebox.showinfo(title=title, message="Your download has completed successfully!")
         else:
-            msg = error_detail if error_detail else "An unknown error occurred."
+            msg = error_detail or "An unknown error occurred."
             messagebox.showerror(title=title, message=msg)
 
     def get_build_info(self):                                                                                 
