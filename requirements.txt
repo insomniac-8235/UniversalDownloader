@@ -1,4 +1,4 @@
 customtkinter==5.2.2
 Pillow==12.2.0
-PyInstaller==6.19.0
+PyInstaller==6.20.0
 yt_dlp==2026.3.17
